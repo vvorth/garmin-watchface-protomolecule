@@ -144,6 +144,7 @@ OFF = rgb(T["OFF"])
 DND_ON = rgb(T["DND_ON"])
 ALARM_ON = rgb(T["ALARM_ON"])
 NOTIFICATION_ON = rgb(T["NOTIFICATION_ON"])
+NOTIFICATION_TEXT = rgb(T["NOTIFICATION_TEXT"])
 ARC_BODY_BATTERY = rgb(T["ARC_BODY_BATTERY"])
 ARC_DEVICE_BATTERY = rgb(T["ARC_DEVICE_BATTERY"])
 ARC_DAYLIGHT = rgb(T["ARC_DAYLIGHT"])
@@ -393,7 +394,7 @@ class Face:
         Icons.notification(self, self.cx, y, radius, NOTIFICATION_ON if count > 0 else OFF)
         text_y = y - radius * 0.15
         if count > 0:
-            self.text(self.cx, text_y, self.badge_font, str(count), TEXT, align="center")
+            self.text(self.cx, text_y, self.badge_font, str(count), NOTIFICATION_TEXT, align="center")
 
         if SAMPLE["battery_days"] is not None:
             self.text(self.w * 0.32, text_y, self.small_font, SAMPLE["battery_days"], TEXT_DIM, align="center")

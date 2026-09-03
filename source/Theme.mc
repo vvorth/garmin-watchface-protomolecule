@@ -27,7 +27,11 @@ module Theme {
   const OFF as Number = 0x555555;
   const DND_ON as Number = 0xFF0000;
   const ALARM_ON as Number = 0xFFFF00;
-  const NOTIFICATION_ON as Number = 0xFF5500;
+  //! Note: 0xFF8000 is off the MIP 64-colour palette (green channel 0x80), so
+  //! the panel dithers it slightly. Nearest clean orange is 0xFFAA00.
+  const NOTIFICATION_ON as Number = 0xFF8000;
+  //! The count sits on top of NOTIFICATION_ON — black reads, white does not.
+  const NOTIFICATION_TEXT as Number = 0x000000;
 
   const ARC_BODY_BATTERY as Number = 0x00FF00;
   const ARC_DEVICE_BATTERY as Number = 0x00FFFF;

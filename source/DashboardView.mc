@@ -298,7 +298,7 @@ class DashboardView extends WatchUi.WatchFace {
     // body's centre line, which is above the badge's geometric centre.
     var textY = y - radius * 0.15;
     if (count > 0) {
-      dc.setColor(Theme.TEXT, Graphics.COLOR_TRANSPARENT);
+      dc.setColor(Theme.NOTIFICATION_TEXT, Graphics.COLOR_TRANSPARENT);
       dc.drawText(mCenterX, textY, mBadgeFont, count.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
