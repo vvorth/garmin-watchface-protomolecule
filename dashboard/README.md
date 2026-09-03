@@ -8,6 +8,9 @@ status row, a battery row, and three progress arcs around the bottom edge.
 
 *(rendered by `tools/preview.py`, not the simulator — see [Previewing](#previewing-without-the-simulator))*
 
+The design this was built to, and the original brief behind each row, are in
+[`docs/brief.md`](docs/brief.md).
+
 This lives beside the existing Protomolecule face in the repository root; the
 two projects are independent and neither one's build touches the other.
 
