@@ -35,8 +35,11 @@ module Graph {
     var bar = barWidth(screenWidth);
     var step = pitch(screenWidth);
     var total = count * step - (step - bar);
-    var x = cx - total / 2.0;
-    var height = bottom - top;
+    // Snap the origin and the baseline to whole pixels so every bar sits on the
+    // exact same line and the columns are evenly spaced.
+    var x = Math.round(cx - total / 2.0).toNumber();
+    var base = Math.round(bottom).toNumber();
+    var height = base - top;
 
     var low = 0.0;
     var high = 100.0;
@@ -59,7 +62,7 @@ module Graph {
       var left = x + i * step;
       if (value == null) {
         // No sample in this slot: leave a one pixel high tick on the baseline.
-        dc.fillRectangle(left, bottom - 1, bar, 1);
+        dc.fillRectangle(left, base - 1, bar, 1);
         continue;
       }
       var norm = (value - low) / (high - low);
@@ -69,8 +72,8 @@ module Graph {
       if (norm > 1.0) {
         norm = 1.0;
       }
-      var barHeight = height * (MIN_BAR + (1.0 - MIN_BAR) * norm);
-      dc.fillRectangle(left, bottom - barHeight, bar, barHeight);
+      var barHeight = Math.round(height * (MIN_BAR + (1.0 - MIN_BAR) * norm)).toNumber();
+      dc.fillRectangle(left, base - barHeight, bar, barHeight);
     }
   }
 

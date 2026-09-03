@@ -201,8 +201,15 @@ class DashboardView extends WatchUi.WatchFace {
   hidden function drawGraph(dc as Graphics.Dc) as Void {
     var top = Layout.GRAPH_TOP_Y * mHeight;
     var bottom = Layout.GRAPH_BOTTOM_Y * mHeight;
-    var half = chord(bottom);
-    var buckets = Graph.bucketCount(mWidth, half);
+
+    // Frame the graph under the separator above it: as wide as that separator
+    // chord, pulled in on each side by the same gap that sits between the
+    // separator and the top of the graph. The face tapers upward, so this
+    // keeps the graph neatly inside the trapezoid instead of running wide at
+    // its base.
+    var margin = top - Layout.SEP_2_Y * mHeight;
+    var halfWidth = chord(Layout.SEP_2_Y * mHeight) - margin;
+    var buckets = Graph.bucketCount(mWidth, halfWidth);
 
     var source = Data.graphSource();
     var values = Data.graphSeries(source, Data.graphHours(), buckets);
@@ -279,9 +286,10 @@ class DashboardView extends WatchUi.WatchFace {
   hidden function drawBatteryRow(dc as Graphics.Dc, settings as System.DeviceSettings) as Void {
     var top = Layout.SEP_5_Y * mHeight + 1;
     var bottom = mCenterY + mRadius - Theme.ARC_EDGE_INSET - Theme.ARC_FILL_PEN - 1; // 1 px inside the fill arc
-    // 0.95: a touch smaller than the full slot. Top stays pinned to `top`.
+    // 0.95: a touch smaller than the full slot. +2: nudged down off the
+    // separator so it does not look like it is clinging to it.
     var radius = (bottom - top) / Icons.NOTIFICATION_SPAN * 0.95;
-    var y = top + radius * 0.75;
+    var y = top + radius * 0.75 + 2;
 
     var count = settings.notificationCount == null ? 0 : settings.notificationCount;
     Icons.notification(dc, mCenterX, y, radius, count > 0 ? Theme.NOTIFICATION_ON : Theme.OFF);
