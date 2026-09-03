@@ -223,30 +223,16 @@ module Icons {
     dc.setPenWidth(1);
   }
 
-  //! Speech bubble. Filled with `color` when there is something to show,
-  //! outlined when the count is zero.
-  function notification(dc as Graphics.Dc, x as Numeric, y as Numeric, r as Numeric, color as Number, filled as Boolean) as Void {
+  //! Speech bubble, always a solid fill in `color` (grey when idle, orange with
+  //! a count otherwise). The caller draws the number on top.
+  function notification(dc as Graphics.Dc, x as Numeric, y as Numeric, r as Numeric, color as Number) as Void {
     dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-    var left = x - r * 0.86;
-    var top = y - r * 0.72;
-    var w = r * 1.72;
-    var h = r * 1.24;
-    var radius = r * 0.3;
-    var tail = [
-      pt(x - r * 0.2, y + r * 0.44),
-      pt(x + r * 0.2, y + r * 0.44),
-      pt(x - r * 0.06, y + r * 1.0),
-    ];
-    if (filled) {
-      dc.fillRoundedRectangle(left, top, w, h, radius);
-      dc.fillPolygon(tail);
-    } else {
-      dc.setPenWidth(penWidth(r * 0.16));
-      dc.drawRoundedRectangle(left, top, w, h, radius);
-      dc.drawLine(tail[0][0], tail[0][1], tail[2][0], tail[2][1]);
-      dc.drawLine(tail[1][0], tail[1][1], tail[2][0], tail[2][1]);
-      dc.setPenWidth(1);
-    }
+    dc.fillRoundedRectangle(x - r * 0.9, y - r * 0.78, r * 1.8, r * 1.34, r * 0.34);
+    dc.fillPolygon([
+      pt(x - r * 0.22, y + r * 0.5),
+      pt(x + r * 0.22, y + r * 0.5),
+      pt(x - r * 0.04, y + r * 1.08),
+    ]);
   }
 
   function penWidth(value as Numeric) as Number {

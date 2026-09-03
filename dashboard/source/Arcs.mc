@@ -17,10 +17,12 @@ module Arcs {
 
     // Left: body battery, growing from the bottom end upwards.
     if (bodyBattery != null) {
+      track(dc, cx, cy, radius, Layout.ARC_LEFT_FROM, Layout.ARC_LEFT_TO);
       sweep(dc, cx, cy, radius, Theme.ARC_BODY_BATTERY, Layout.ARC_LEFT_FROM, Layout.ARC_LEFT_TO, bodyBattery);
     }
 
     // Centre: device battery, growing out of the 6 o'clock position both ways.
+    track(dc, cx, cy, radius, Layout.ARC_CENTER - Layout.ARC_CENTER_SPREAD, Layout.ARC_CENTER + Layout.ARC_CENTER_SPREAD);
     var spread = Layout.ARC_CENTER_SPREAD * clamp(deviceBattery);
     if (spread >= MIN_SWEEP) {
       dc.setColor(Theme.ARC_DEVICE_BATTERY, Graphics.COLOR_TRANSPARENT);
@@ -30,10 +32,19 @@ module Arcs {
 
     // Right: daylight left, full at sunrise and empty at sunset.
     if (daylight != null) {
+      track(dc, cx, cy, radius, Layout.ARC_RIGHT_FROM, Layout.ARC_RIGHT_TO);
       sweep(dc, cx, cy, radius, Theme.ARC_DAYLIGHT, Layout.ARC_RIGHT_FROM, Layout.ARC_RIGHT_TO, daylight);
     }
 
     dc.setPenWidth(1);
+  }
+
+  //! The full length of an arc track, in the unfilled colour, so the coloured
+  //! fill on top can be read as a fraction of it.
+  function track(dc as Graphics.Dc, cx as Numeric, cy as Numeric, radius as Numeric, from as Number, to as Number) as Void {
+    dc.setColor(Theme.ARC_TRACK, Graphics.COLOR_TRANSPARENT);
+    var direction = to > from ? Graphics.ARC_COUNTER_CLOCKWISE : Graphics.ARC_CLOCKWISE;
+    dc.drawArc(cx, cy, radius, direction, from, to);
   }
 
   //! Draws `fraction` of the track that runs from `from` to `to`, always

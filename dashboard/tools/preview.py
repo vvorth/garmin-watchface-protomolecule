@@ -69,11 +69,11 @@ SUPERSAMPLE = 4  # render this many times larger, then filter down
 # Fixed sample readings the mock draws.
 SAMPLE = {
     "date": "Thu 3 Sep",
-    "temp": "13°",
+    "temp": "27°",
     "precip": "40%",
-    "condition": 1,  # Icons.PARTLY_CLOUDY
-    "high": "17°",
-    "low": "8°",
+    "condition": 0,  # Icons.SUN
+    "high": "21°",
+    "low": "4°",
     "graph": [58, 61, 55, None, 62, 66, 72, 95, 90, 88, 92, 87, 91, 86,
               89, 84, 88, 83, 86, 78, 74, 70, 66, 63, 60, 62, 64, 61, 59],
     "graph_is_percentage": False,
@@ -86,9 +86,9 @@ SAMPLE = {
     "battery_days": "12d",
     "battery_pct": "64%",
     "notifications": 1,
-    "arc_body_battery": 0.35,
+    "arc_body_battery": 0.62,
     "arc_device_battery": 0.64,
-    "arc_daylight": 0.22,
+    "arc_daylight": 0.40,
 }
 
 
@@ -138,6 +138,7 @@ NOTIFICATION_ON = rgb(T["NOTIFICATION_ON"])
 ARC_BODY_BATTERY = rgb(T["ARC_BODY_BATTERY"])
 ARC_DEVICE_BATTERY = rgb(T["ARC_DEVICE_BATTERY"])
 ARC_DAYLIGHT = rgb(T["ARC_DAYLIGHT"])
+ARC_TRACK = rgb(T["ARC_TRACK"])
 
 # Layout fractions (source/Theme.mc, module Layout)
 DATE_Y = T["DATE_Y"]
@@ -209,10 +210,12 @@ class Face:
         # source/DashboardView.mc onLayout()
         time_band = (SEP_4_Y - SEP_3_Y) * self.h
         self.time_font = self.fit(self.time_fonts, "88 88",
-                                  self.chord(TIME_Y * self.h) * 2, time_band)
+                                  self.chord(TIME_Y * self.h) * 2, time_band * 1.15)
         self.row_font = self.fit(self.row_fonts, "88.8k", self.w * 0.3, self.h * 0.095)
         self.small_font = self.fit(self.row_fonts, "888% 888°",
                                    self.w * 0.44, self.h * 0.078)
+        self.date_font = self.fit(self.row_fonts, "Www 30 Www", self.w * 0.54, self.h * 0.054)
+        self.weather_font = self.fit(self.row_fonts, "888%", self.w * 0.17, self.h * 0.058)
         self.badge_font = self.fit(self.row_fonts, "88", self.w * 0.06, self.h * 0.055)
 
     # -- primitives (Pillow, supersampled) --------------------------------
@@ -291,33 +294,37 @@ class Face:
 
     # -- rows -----------------------------------------------------------
     def draw_date(self):
-        self.text(self.cx, DATE_Y * self.h, self.small_font, SAMPLE["date"], DATE, align="center")
+        self.text(self.cx, DATE_Y * self.h, self.date_font, SAMPLE["date"], DATE, align="center")
 
     def draw_weather(self):
         y = WEATHER_Y * self.h
-        icon_r = self.w * 0.042
-        gap = self.w * 0.026
+        icon_r = self.w * 0.040
+        pad = self.w * 0.030
+        gap = self.w * 0.022
         current, precip = SAMPLE["temp"], SAMPLE["precip"]
         high, low = SAMPLE["high"], SAMPLE["low"]
 
-        total = icon_r * 2
-        for piece in (current, precip, high, low):
-            if piece is not None:
-                total += self.text_width(piece, self.small_font) + gap
+        Icons.weather(self, SAMPLE["condition"], self.cx, y, icon_r, TEXT)
 
-        x = self.cx - total / 2.0
-        x = self._segment(x, y, current, TEXT, gap)
-        x = self._segment(x, y, precip, TEXT, gap)
-        Icons.weather(self, SAMPLE["condition"], x + icon_r, y, icon_r, TEXT)
-        x += icon_r * 2 + gap
-        x = self._segment(x, y, high, TEXT, gap)
-        self._segment(x, y, low, TEXT_DIM, gap)
+        edge = self.cx - icon_r - pad
+        edge = self._field_right(edge, y, precip, TEXT, gap)
+        self._field_right(edge, y, current, TEXT, gap)
 
-    def _segment(self, x, y, string, color, gap):
+        edge = self.cx + icon_r + pad
+        edge = self._field_left(edge, y, high, TEXT, gap)
+        self._field_left(edge, y, low, TEXT_DIM, gap)
+
+    def _field_right(self, x, y, string, color, gap):
         if string is None:
             return x
-        self.text(x, y, self.small_font, string, color, align="left")
-        return x + self.text_width(string, self.small_font) + gap
+        self.text(x, y, self.weather_font, string, color, align="right")
+        return x - self.text_width(string, self.weather_font) - gap
+
+    def _field_left(self, x, y, string, color, gap):
+        if string is None:
+            return x
+        self.text(x, y, self.weather_font, string, color, align="left")
+        return x + self.text_width(string, self.weather_font) + gap
 
     def draw_graph(self):
         top = GRAPH_TOP_Y * self.h
@@ -342,27 +349,26 @@ class Face:
 
     def draw_status_row(self):
         y = STATUS_Y * self.h
-        icon_r = self.w * 0.043
+        icon_r = self.w * 0.044
         bb = SAMPLE["body_battery"]
-        self.text(self.w * 0.2, y, self.row_font,
+        Icons.do_not_disturb(self, self.w * 0.175, y, icon_r, DND_ON if SAMPLE["dnd"] else OFF)
+        self.text(self.w * 0.335, y, self.row_font,
                   "--" if bb is None else str(bb),
                   TEXT_DIM if bb is None else TEXT, align="center")
-        Icons.do_not_disturb(self, self.w * 0.395, y, icon_r, DND_ON if SAMPLE["dnd"] else OFF)
-        Icons.alarm(self, self.w * 0.545, y, icon_r, ALARM_ON if SAMPLE["alarm"] else OFF)
-        self.text(self.w * 0.8, y, self.row_font, SAMPLE["steps"], TEXT, align="center")
+        Icons.alarm(self, self.cx, y, icon_r, ALARM_ON if SAMPLE["alarm"] else OFF)
+        self.text(self.w * 0.775, y, self.row_font, SAMPLE["steps"], TEXT, align="center")
 
     def draw_battery_row(self):
         y = BATTERY_Y * self.h
         if SAMPLE["battery_days"] is not None:
-            self.text(self.w * 0.375, y, self.small_font, SAMPLE["battery_days"], TEXT, align="center")
-        self.text(self.w * 0.625, y, self.small_font, SAMPLE["battery_pct"], TEXT, align="center")
+            self.text(self.w * 0.335, y, self.small_font, SAMPLE["battery_days"], TEXT, align="center")
+        self.text(self.w * 0.665, y, self.small_font, SAMPLE["battery_pct"], TEXT, align="center")
 
         count = SAMPLE["notifications"]
-        radius = self.w * 0.045
-        Icons.notification(self, self.cx, y, radius,
-                           NOTIFICATION_ON if count > 0 else OFF, count > 0)
+        radius = self.w * 0.056
+        Icons.notification(self, self.cx, y, radius, NOTIFICATION_ON if count > 0 else OFF)
         if count > 0:
-            self.text(self.cx, y - radius * 0.1, self.badge_font, str(count), TEXT, align="center")
+            self.text(self.cx, y - radius * 0.12, self.badge_font, str(count), TEXT, align="center")
 
     def draw_arcs(self):
         pen = max(3, round(self.w * 0.023))
@@ -374,7 +380,7 @@ class Face:
         # source/DashboardView.mc drawSleepFace(): date + time only, dimmed,
         # nudged over a 5-minute cycle.  Preview picks one offset in that cycle.
         offset_y = -1 * (self.h / 12.0)
-        self.text(self.cx, SEP_3_Y * self.h + offset_y, self.small_font,
+        self.text(self.cx, SEP_3_Y * self.h + offset_y, self.date_font,
                   SAMPLE["date"], TEXT_DIM, align="center")
         # time drawn dim
         hours, minutes = SAMPLE["hours"], SAMPLE["minutes"]
@@ -486,17 +492,25 @@ class Arcs:
     @staticmethod
     def draw(face, cx, cy, radius, pen, body_battery, device_battery, daylight):
         if body_battery is not None:
+            Arcs._track(face, cx, cy, radius, ARC_LEFT_FROM, ARC_LEFT_TO, pen)
             Arcs._sweep(face, cx, cy, radius, ARC_BODY_BATTERY,
                         ARC_LEFT_FROM, ARC_LEFT_TO, body_battery, pen)
 
+        Arcs._track(face, cx, cy, radius,
+                    ARC_CENTER - ARC_CENTER_SPREAD, ARC_CENTER + ARC_CENTER_SPREAD, pen)
         spread = ARC_CENTER_SPREAD * Arcs.clamp(device_battery)
         if spread >= Arcs.MIN_SWEEP:
             face.arc(cx, cy, radius, ARC_DEVICE_BATTERY, ARC_CENTER, ARC_CENTER - spread, pen)
             face.arc(cx, cy, radius, ARC_DEVICE_BATTERY, ARC_CENTER, ARC_CENTER + spread, pen)
 
         if daylight is not None:
+            Arcs._track(face, cx, cy, radius, ARC_RIGHT_FROM, ARC_RIGHT_TO, pen)
             Arcs._sweep(face, cx, cy, radius, ARC_DAYLIGHT,
                         ARC_RIGHT_FROM, ARC_RIGHT_TO, daylight, pen)
+
+    @staticmethod
+    def _track(face, cx, cy, radius, frm, to, pen):
+        face.arc(cx, cy, radius, ARC_TRACK, frm, to, pen)
 
     @staticmethod
     def _sweep(face, cx, cy, radius, color, frm, to, fraction, pen):
@@ -602,18 +616,10 @@ class Icons:
         face.line(x, y + r * 0.1, x + r * 0.34, y + r * 0.24, color, stroke)
 
     @staticmethod
-    def notification(face, x, y, r, color, filled):
-        tail = [(x - r * 0.2, y + r * 0.44), (x + r * 0.2, y + r * 0.44),
-                (x - r * 0.06, y + r * 1.0)]
-        if filled:
-            face.rounded(x - r * 0.86, y - r * 0.72, r * 1.72, r * 1.24, r * 0.3, color)
-            face.polygon(tail, color)
-        else:
-            w = max(1, round(r * 0.16))
-            face.rounded(x - r * 0.86, y - r * 0.72, r * 1.72, r * 1.24, r * 0.3,
-                         color, filled=False, width=w)
-            face.line(tail[0][0], tail[0][1], tail[2][0], tail[2][1], color, w)
-            face.line(tail[1][0], tail[1][1], tail[2][0], tail[2][1], color, w)
+    def notification(face, x, y, r, color):
+        face.rounded(x - r * 0.9, y - r * 0.78, r * 1.8, r * 1.34, r * 0.34, color)
+        face.polygon([(x - r * 0.22, y + r * 0.5), (x + r * 0.22, y + r * 0.5),
+                      (x - r * 0.04, y + r * 1.08)], color)
 
 
 # --- cli ------------------------------------------------------------
