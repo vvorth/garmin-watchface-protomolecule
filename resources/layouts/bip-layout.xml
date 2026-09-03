@@ -1,6 +1,0 @@
-<layout id="BurnInProtectionLayout">
-	<drawable id="Background" class="Background"/>
-  <drawable id="DateAndTime" class="DateAndTime">
-    <param name="justifyDate">1</param>
-  </drawable>
-</layout>

@@ -1,34 +1,9 @@
-<properties>  
-  <property id="layout" type="number">0</property>
-  <property id="theme" type="number">0</property>
-  
-  <property id="caloriesGoal" type="number">2000</property>
-  <property id="batteryThreshold" type="number">20</property>
-  <property id="bodyBatteryThreshold" type="number">30</property>
-  <property id="activeHeartrate" type="boolean">false</property>
-  <property id="sleepLayoutActive" type="boolean">false</property>
-  <property id="showOrbitIndicatorText" type="boolean">true</property>
-  <property id="showMeridiemText" type="boolean">false</property>
-  <property id="useSystemFontForDate" type="boolean">false</property>
-  <property id="showSeconds" type="boolean">false</property>
-  <property id="dynamicBodyBattery" type="boolean">false</property>
-  
-  <property id="noProgressDataField1" type="number">5</property>
-  <property id="noProgressDataField2" type="number">6</property>
-  <property id="noProgressDataField3" type="number">9</property>
-  
-  <property id="sleepModeDataField1" type="number">5</property>
-  <property id="sleepModeDataField2" type="number">6</property>
-  <property id="sleepModeDataField3" type="number">10</property>
-  <property id="sleepModeDataFieldUp" type="number">2</property>
-  
-  <property id="outerDataField" type="number">2</property>
-  <property id="upperDataField1" type="number">1</property>
-  <property id="upperDataField2" type="number">3</property>
-  <property id="lowerDataField1" type="number">4</property>
-  <property id="lowerDataField2" type="number">7</property>
-
-  <property id="outerOrbitDataField" type="number">1</property>
-  <property id="leftOrbitDataField" type="number">2</property>
-  <property id="rightOrbitDataField" type="number">3</property>
+<properties>
+  <!-- Values match the GraphSource module in source/Data.mc. -->
+  <property id="graphSource" type="number">0</property>
+  <property id="graphHours" type="number">4</property>
+  <!-- Clock digit colours, packed 0xRRGGBB as decimal. One of
+       Data.clockColorChoices(). 16777215 = white, 65535 = cyan. -->
+  <property id="hourColor" type="number">16777215</property>
+  <property id="minuteColor" type="number">65535</property>
 </properties>

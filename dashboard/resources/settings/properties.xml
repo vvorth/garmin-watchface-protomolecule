@@ -1,9 +1,0 @@
-<properties>
-  <!-- Values match the GraphSource module in source/Data.mc. -->
-  <property id="graphSource" type="number">0</property>
-  <property id="graphHours" type="number">4</property>
-  <!-- Clock digit colours, packed 0xRRGGBB as decimal. One of
-       Data.clockColorChoices(). 16777215 = white, 65535 = cyan. -->
-  <property id="hourColor" type="number">16777215</property>
-  <property id="minuteColor" type="number">65535</property>
-</properties>

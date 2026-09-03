@@ -1,6 +1,8 @@
 project.manifest = manifest.xml
 
-# Protomolecule (root project) sources only. Stated explicitly so a build of
-# this project never reaches into the independent dashboard/ project nested
-# below it. dashboard/ has its own monkey.jungle.
+# This project is self-contained. Point the compiler at this directory's own
+# source/ and resources/ explicitly, so the build works the same whether VS
+# Code has the dashboard/ folder open on its own or the repository root open
+# (where the root Protomolecule project sits alongside it).
 base.sourcePath = source
+base.resourcePath = resources
