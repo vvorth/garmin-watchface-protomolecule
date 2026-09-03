@@ -45,19 +45,16 @@ class DashboardView extends WatchUi.WatchFace {
     var settings = System.getDeviceSettings();
     mBurnInProtection = settings has :requiresBurnInProtection && settings.requiresBurnInProtection;
 
-    // Pick the largest system font that still fits each row. Doing this once
-    // here keeps every screen size sharp without a per-device layout file.
-    //
-    // The clock is meant to dominate, like the reference: allow it past the
-    // nominal band height, because the number fonts report more line height
-    // than the digits actually occupy and the row above/below is padding.
-    var timeBand = (Layout.SEP_4_Y - Layout.SEP_3_Y) * mHeight;
-    mTimeFont = Fonts.fit(dc, Fonts.time(), "88 88", chord(Layout.TIME_Y * mHeight) * 2, timeBand * 1.15);
-    mRowFont = Fonts.fit(dc, Fonts.row(), "88.8k", mWidth * 0.3, mHeight * 0.095);
-    mSmallFont = Fonts.fit(dc, Fonts.row(), "888% 888°", mWidth * 0.44, mHeight * 0.078);
-    mDateFont = Fonts.fit(dc, Fonts.row(), "Www 30 Www", mWidth * 0.54, mHeight * 0.054);
-    mWeatherFont = Fonts.fit(dc, Fonts.row(), "888%", mWidth * 0.17, mHeight * 0.058);
-    mBadgeFont = Fonts.fit(dc, Fonts.row(), "88", mWidth * 0.06, mHeight * 0.055);
+    // Clock: the Chivo bitmap digits (resources/fonts/), like the reference.
+    // Everything else is a fixed system font, sized per device by the firmware:
+    //   XTINY - date, weather row, battery row
+    //   TINY  - Body Battery, step count, notification badge number
+    mTimeFont = WatchUi.loadResource(Rez.Fonts.ClockFont);
+    mDateFont = Graphics.FONT_XTINY;
+    mWeatherFont = Graphics.FONT_XTINY;
+    mSmallFont = Graphics.FONT_XTINY;
+    mRowFont = Graphics.FONT_TINY;
+    mBadgeFont = Graphics.FONT_TINY;
   }
 
   function onUpdate(dc as Graphics.Dc) as Void {

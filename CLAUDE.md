@@ -47,21 +47,29 @@ directory), generates the signing key on first run, and calls `monkeyc`.
 - **`tools/preview.py` renders a PNG** so layout changes can be checked without
   the simulator:
   ```sh
-  python3 dashboard/tools/preview.py preview.png            # fenix8solar47mm
-  python3 dashboard/tools/preview.py --device fenix847mm out.png
-  python3 dashboard/tools/preview.py --all                  # one PNG per device
-  python3 dashboard/tools/preview.py --sleep out.png        # burn-in variant
+  python3 dashboard/tools/preview.py preview.png                 # fenix8solar47mm
+  python3 dashboard/tools/preview.py --device fenix8solar51mm out.png
+  python3 dashboard/tools/preview.py --all                       # one PNG per device
+  python3 dashboard/tools/preview.py --sleep out.png             # burn-in variant
   ```
   It is a mock, not an emulator — fixed sample data, DejaVu standing in for the
-  proprietary Garmin fonts. It **parses `source/Theme.mc` at run time**, so the
-  colour palette and the `Layout` fractions never need copying by hand. What is
-  still mirrored by hand is the per-row geometry inside the `draw*` methods (the
-  `0.042`, `0.395`, … literals): **when you touch a `draw` method in
-  `DashboardView.mc` / `Arcs.mc` / `Graph.mc` / `Icons.mc`, change the matching
-  method in `preview.py`.** For transflective devices it snaps every pixel to
-  the 64-colour MIP palette, so dithering shows up in the preview.
-- **No bitmap assets.** Every icon is drawn from primitives in `source/Icons.mc`
-  and scales with the screen. Watch faces have a small fixed heap; keep it that
+  Garmin system fonts (but the real Chivo for the clock). It **parses
+  `source/Theme.mc` at run time**, so the colour palette and the `Layout`
+  fractions never need copying by hand. What is still mirrored by hand is the
+  per-row geometry inside the `draw*` methods (the `0.042`, `0.395`, … literals):
+  **when you touch a `draw` method in `DashboardView.mc` / `Arcs.mc` /
+  `Graph.mc` / `Icons.mc`, change the matching method in `preview.py`.** For
+  transflective devices it snaps every pixel to the 64-colour MIP palette, so
+  dithering shows up in the preview.
+- **Fonts.** The clock is a Chivo bitmap font in `resources/fonts/`, generated
+  by `tools/make_clock_font.py` from `tools/fonts/Chivo[wght].ttf` (SIL OFL) —
+  Connect IQ has no runtime rasteriser, so custom faces ship as an AngelCode
+  `.fnt` + `_0.png` atlas. Only digits and space are baked in. Everything else
+  is a fixed system font (`FONT_XTINY` / `FONT_TINY`), sized per device by the
+  firmware. The bitmap font is one fixed pixel size (for 260×260); adding a
+  device of another size means a matching `resources-round-<w>x<h>/fonts/`.
+- **Icons are drawn from primitives** in `source/Icons.mc` and scale with the
+  screen — no icon bitmaps. Watch faces have a small fixed heap; keep it that
   way.
 - **Guard every optional API.** Devices differ, sensors are absent, weather may
   not have synced. `source/Data.mc` is the only place that reads watch state and

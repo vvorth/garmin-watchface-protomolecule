@@ -69,9 +69,9 @@ to install an SDK and the device, and add the SDK's `bin/` to `PATH`.
 
 ```sh
 cd dashboard
-./build.sh                    # fenix8solar47mm, release build → bin/dashboard-fenix8solar47mm.prg
-./build.sh fenix847mm         # some other device in manifest.xml
-./build.sh fenix8solar47mm -d # debug build, needed by the simulator
+./build.sh                     # fenix8solar47mm, release build → bin/dashboard-fenix8solar47mm.prg
+./build.sh fenix8solar51mm     # the other device in manifest.xml
+./build.sh fenix8solar47mm -d  # debug build, needed by the simulator
 ```
 
 `build.sh` finds the SDK (via `PATH`, `CIQ_SDK`, or the SDK Manager's default
@@ -155,8 +155,9 @@ compiled to bytecode for a small VM on the watch. A few properties of it shape
 everything here:
 
 - **Memory is the binding constraint.** A watch face gets a fixed, small heap.
-  That is why there are no bitmap assets: every icon is drawn from primitives in
-  `source/Icons.mc` and scales with the screen instead.
+  That is why every icon is drawn from primitives in `source/Icons.mc` and
+  scales with the screen instead of shipping as a bitmap. The one bitmap
+  resource is the clock font (digits only).
 - **`onUpdate` runs once a minute** on a memory-in-pixel screen like the
   fenix 8 Solar, so the face redraws itself completely each time and keeps no
   state between frames. There is no partial-update path because nothing on the
@@ -177,7 +178,6 @@ source/
   DashboardApp.mc                AppBase: entry point, settings view
   DashboardView.mc               the face — all drawing happens here
   Theme.mc                       colour palette + the vertical layout fractions
-  Fonts.mc                       picks the largest system font that fits a row
   Data.mc                        every read of watch state, all of it defensive
   Graph.mc                       the history graph
   Arcs.mc                        the three bottom arcs
@@ -185,10 +185,12 @@ source/
   settings/DashboardSettings.mc  the on-watch settings menu
 resources/
   strings/strings.xml            user-visible text
+  fonts/                         Chivo bitmap clock font (fnt + png atlas)
   settings/properties.xml        property defaults
   settings/settings.xml          the Garmin Connect settings screen
   drawables/                     launcher icon
 tools/preview.py                 static preview renderer
+tools/make_clock_font.py         regenerates resources/fonts/ from tools/fonts/
 build.sh                         SDK lookup, key generation, compile
 ```
 
@@ -197,9 +199,9 @@ build.sh                         SDK lookup, key generation, compile
 `source/Theme.mc` holds the whole vertical layout as fractions of the screen
 height, measured off the reference design. Everything else derives from the
 screen size at run time, so the face is not tied to 260×260: the separator lines
-follow the chord of a circle just inside the bezel, the graph fits as many bars
-as the width allows, and `Fonts.fit` measures the built-in system fonts and
-keeps the largest that fits each row.
+follow the chord of a circle just inside the bezel, and the graph fits as many
+bars as the width allows. Text is `FONT_XTINY` / `FONT_TINY` (the firmware sizes
+those per device); only the clock is a fixed-size bitmap.
 
 ### Colours
 
@@ -207,14 +209,23 @@ All colours are from the 64-colour palette a MIP screen renders natively — eac
 channel is one of `0x00`, `0x55`, `0xAA`, `0xFF`. Anything else gets dithered by
 the firmware and looks grainy on the watch.
 
+### The clock font
+
+The reference clock is Chivo. Connect IQ has no runtime font rasteriser, so it
+ships as an AngelCode bitmap font (`resources/fonts/Chivo76.fnt` + `_0.png`
+atlas, declared in `fonts.xml` as `Rez.Fonts.ClockFont`). Regenerate it with:
+
+```sh
+python3 tools/make_clock_font.py --px 76 --weight 700
+```
+
+from `tools/fonts/Chivo[wght].ttf` (SIL OFL, licence alongside it). Only `0`-`9`
+and space are baked in — the face never draws a colon. The size is fixed for a
+260 px screen; another screen size needs its own `resources-round-<w>x<h>/fonts/`
+with a rerun at a scaled `--px`.
+
 ### Known deviations from the reference
 
-- **The digits are Garmin's system number font**, not the wide bold face in the
-  reference, which is a custom bitmap font. Adding one means generating a
-  BMFont `.fnt` + PNG pair and a `resources/fonts/fonts.xml` — the
-  `resources-round-260x260/fonts/` directory of the Protomolecule project next
-  door is a working example of the format. `Fonts.time()` in `source/Fonts.mc` is
-  where you would slot it in.
 - **The weather condition icons are approximations** grouped into eight shapes
   (sun, partly cloudy, cloudy, rain, snow, storm, fog, wind); Connect IQ reports
   around fifty distinct conditions.
