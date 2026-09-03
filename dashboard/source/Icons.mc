@@ -254,8 +254,10 @@ module Icons {
     return w < 1 ? 1 : w;
   }
 
-  //! fillPolygon wants integer vertices.
-  function pt(x as Numeric, y as Numeric) as Array<Number> {
+  //! fillPolygon wants integer vertices, and its parameter is typed as an
+  //! array of [x, y] pairs -- so the return type is the pair tuple, not a
+  //! plain Array<Number>, or the array literals below fail the type check.
+  function pt(x as Numeric, y as Numeric) as [Numeric, Numeric] {
     return [Math.round(x).toNumber(), Math.round(y).toNumber()];
   }
 }
