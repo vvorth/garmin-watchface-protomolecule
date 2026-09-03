@@ -1,0 +1,5 @@
+<properties>
+  <!-- Values match the GraphSource module in source/Data.mc. -->
+  <property id="graphSource" type="number">0</property>
+  <property id="graphHours" type="number">4</property>
+</properties>

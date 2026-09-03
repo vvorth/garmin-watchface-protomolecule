@@ -1,0 +1,90 @@
+# Builds dashboard/ into a .prg and attaches it to the run as an artifact.
+#
+# Garmin does not publish a stable, unauthenticated URL for the Connect IQ SDK
+# or for the per-device definitions, and both are behind a licence click-through
+# — so this workflow cannot fetch them on its own. Give it the two URLs once and
+# it will build on every push:
+#
+#   1. Install the SDK locally (see dashboard/README.md).
+#   2. Repository Settings -> Secrets and variables -> Actions -> Variables:
+#        CIQ_SDK_URL      a URL serving the Linux SDK zip
+#        CIQ_DEVICES_URL  a URL serving a zip of ~/.Garmin/ConnectIQ/Devices
+#      (Uploading both to a private release of this repo works well.)
+#
+# Without those variables the workflow stops early with an explanation rather
+# than failing halfway through.
+name: dashboard
+
+on:
+  push:
+    paths:
+      - "dashboard/**"
+      - ".github/workflows/dashboard.yml"
+  workflow_dispatch:
+    inputs:
+      device:
+        description: Device to build for
+        default: fenix8solar47mm
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the SDK is configured
+        env:
+          CIQ_SDK_URL: ${{ vars.CIQ_SDK_URL }}
+          CIQ_DEVICES_URL: ${{ vars.CIQ_DEVICES_URL }}
+        run: |
+          if [ -z "$CIQ_SDK_URL" ] || [ -z "$CIQ_DEVICES_URL" ]; then
+            echo "::warning::CIQ_SDK_URL / CIQ_DEVICES_URL are not set; see the comment at the top of this workflow."
+            echo "skip=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-java@v4
+        if: env.skip != 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install the Connect IQ SDK
+        if: env.skip != 'true'
+        env:
+          CIQ_SDK_URL: ${{ vars.CIQ_SDK_URL }}
+          CIQ_DEVICES_URL: ${{ vars.CIQ_DEVICES_URL }}
+        run: |
+          set -eu
+          curl -fsSL "$CIQ_SDK_URL" -o /tmp/sdk.zip
+          mkdir -p "$HOME/ciq-sdk"
+          unzip -q /tmp/sdk.zip -d "$HOME/ciq-sdk"
+          # The zip may or may not contain a single top level directory.
+          if [ ! -x "$HOME/ciq-sdk/bin/monkeyc" ]; then
+            inner="$(find "$HOME/ciq-sdk" -maxdepth 2 -type f -name monkeyc -printf '%h\n' | head -1)"
+            echo "CIQ_SDK=$(dirname "$inner")" >> "$GITHUB_ENV"
+          else
+            echo "CIQ_SDK=$HOME/ciq-sdk" >> "$GITHUB_ENV"
+          fi
+          chmod +x "$HOME"/ciq-sdk/bin/* 2>/dev/null || true
+
+          curl -fsSL "$CIQ_DEVICES_URL" -o /tmp/devices.zip
+          mkdir -p "$HOME/.Garmin/ConnectIQ/Devices"
+          unzip -q /tmp/devices.zip -d "$HOME/.Garmin/ConnectIQ/Devices"
+
+      - name: Build
+        if: env.skip != 'true'
+        env:
+          DEVICE: ${{ inputs.device || 'fenix8solar47mm' }}
+        run: |
+          chmod +x "$CIQ_SDK"/bin/* 2>/dev/null || true
+          ./dashboard/build.sh "$DEVICE"
+
+      - uses: actions/upload-artifact@v4
+        if: env.skip != 'true'
+        with:
+          name: dashboard-prg
+          path: dashboard/bin/*.prg
+          if-no-files-found: error

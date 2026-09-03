@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+  <iq:application id="ce14f736-a30b-4196-a92a-2e923d99f1a7"
+                  type="watchface"
+                  entry="DashboardApp"
+                  name="@Strings.AppName"
+                  launcherIcon="@Drawables.LauncherIcon"
+                  minSdkVersion="3.4.0">
+    <iq:products>
+      <iq:product id="fenix8solar47mm"/>
+      <iq:product id="fenix8solar51mm"/>
+      <iq:product id="fenix843mm"/>
+      <iq:product id="fenix847mm"/>
+    </iq:products>
+    <iq:permissions>
+      <iq:uses-permission id="SensorHistory"/>
+    </iq:permissions>
+    <iq:languages>
+      <iq:language>eng</iq:language>
+    </iq:languages>
+    <iq:barrels/>
+  </iq:application>
+</iq:manifest>

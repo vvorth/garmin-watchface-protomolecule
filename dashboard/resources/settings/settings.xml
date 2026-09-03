@@ -1,0 +1,15 @@
+<settings>
+  <setting propertyKey="@Properties.graphSource" title="@Strings.GraphSource" prompt="@Strings.GraphSourcePrompt">
+    <settingConfig type="list">
+      <listEntry value="0">@Strings.SourceHeartRate</listEntry>
+      <listEntry value="1">@Strings.SourceBodyBattery</listEntry>
+      <listEntry value="2">@Strings.SourceStress</listEntry>
+      <listEntry value="3">@Strings.SourcePressure</listEntry>
+      <listEntry value="4">@Strings.SourceElevation</listEntry>
+      <listEntry value="5">@Strings.SourceOxygen</listEntry>
+    </settingConfig>
+  </setting>
+  <setting propertyKey="@Properties.graphHours" title="@Strings.GraphHours" prompt="@Strings.GraphHoursPrompt">
+    <settingConfig type="numeric" min="1" max="24"/>
+  </setting>
+</settings>

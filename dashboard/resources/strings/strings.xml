@@ -1,0 +1,17 @@
+<strings>
+  <string id="AppName">Dashboard</string>
+
+  <string id="SettingsTitle">Dashboard</string>
+  <string id="GraphSource">Graph</string>
+  <string id="GraphSourcePrompt">Which history the graph above the time plots.</string>
+  <string id="GraphHours">Graph range</string>
+  <string id="GraphHoursPrompt">How far back the graph reaches.</string>
+  <string id="HoursSuffix">$1$ h</string>
+
+  <string id="SourceHeartRate">Heart rate</string>
+  <string id="SourceBodyBattery">Body Battery</string>
+  <string id="SourceStress">Stress</string>
+  <string id="SourcePressure">Pressure</string>
+  <string id="SourceElevation">Elevation</string>
+  <string id="SourceOxygen">Pulse Ox</string>
+</strings>
