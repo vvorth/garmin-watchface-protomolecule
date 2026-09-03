@@ -1,1 +1,6 @@
 project.manifest = manifest.xml
+
+# Protomolecule (root project) sources only. Stated explicitly so a build of
+# this project never reaches into the independent dashboard/ project nested
+# below it. dashboard/ has its own monkey.jungle.
+base.sourcePath = source

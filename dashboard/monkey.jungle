@@ -1,1 +1,8 @@
 project.manifest = manifest.xml
+
+# This project is self-contained. Point the compiler at this directory's own
+# source/ and resources/ explicitly, so the build works the same whether VS
+# Code has the dashboard/ folder open on its own or the repository root open
+# (where the root Protomolecule project sits alongside it).
+base.sourcePath = source
+base.resourcePath = resources

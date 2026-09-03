@@ -40,14 +40,20 @@ Java 17+ must be on `PATH` (`monkeyc` is a Java program).
 
 Do this first — it is the real check that the code compiles and runs.
 
-1. **Open the `dashboard/` folder as its own VS Code window**
-   (`File → Open Folder…` → `…/garmin-watchface-protomolecule/dashboard`).
-   Opening the repository root instead makes the extension pick up the
-   Protomolecule project in the root, not this one.
-2. Command Palette → **Monkey C: Build Current Project**. Choose `fenix8solar47mm`.
+> ⚠️ **Open the `dashboard/` folder as its own VS Code window**
+> (`File → Open Folder…` → `…/garmin-watchface-protomolecule/dashboard`).
+>
+> If you open the **repository root** instead, the Monkey C extension builds the
+> root **Protomolecule** project (output `garminwatchfaceprotomolecule.prg`, a
+> long list of `Invalid device id` warnings, and `Undefined symbol ':SettingsTitle'`
+> / `':SourceHeartRate'` errors from `dashboard/source/settings/` — because the
+> Protomolecule build is compiling this project's code against Protomolecule's
+> string resources). That is the wrong project. Close it and open `dashboard/`.
+
+1. Command Palette → **Monkey C: Build Current Project**. Choose `fenix8solar47mm`.
    On the first run it offers to generate a developer key — accept.
-3. If the build fails, the **Problems** panel shows the exact file and line.
-4. When it builds clean: Command Palette → **Monkey C: Run App in Simulator**
+2. If the build fails, the **Problems** panel shows the exact file and line.
+3. When it builds clean: Command Palette → **Monkey C: Run App in Simulator**
    (or `F5`). The face should match `docs/preview.png`.
 
 Things to check in the simulator:
@@ -134,6 +140,7 @@ python3 tools/preview.py --sleep out.png                  # burn-in variant
 
 | Symptom | Fix |
 | --- | --- |
+| Build output is `garminwatchfaceprotomolecule.prg`, ~100 `Invalid device id` warnings, `Undefined symbol ':SettingsTitle'` / `':SourceHeartRate'` errors | You built the **root Protomolecule** project, not this one. Open the `dashboard/` folder on its own (see section A), or run `./build.sh` from inside `dashboard/`. |
 | `could not find the Connect IQ SDK` from `build.sh` | `export CIQ_SDK=…` pointing at the SDK root (the dir containing `bin/monkeyc`), or add `bin/` to `PATH`. |
 | `Cannot find device 'fenix8solar47mm'` | Device files not installed — **Connect IQ: Download Devices** in VS Code, or the SDK Manager. |
 | Build fails with `monkeyc` errors | The `dashboard/` source has never been through a compiler; first-build errors are expected. The Problems panel / stderr names the file and line. |
