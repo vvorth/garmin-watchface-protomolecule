@@ -47,6 +47,9 @@ menu and the Connect settings drive the same two values.
 
 ## Building a .prg
 
+**Short version / checklist: [`BUILDING.md`](BUILDING.md).** The rest of this
+section is the same steps with more context.
+
 ### 1. Install the Connect IQ SDK
 
 The compiler is not on any package registry — it ships only in Garmin's SDK,
