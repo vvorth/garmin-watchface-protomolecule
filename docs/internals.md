@@ -1,8 +1,8 @@
 # Dashboard face internals
 
-How the face in `dashboard/` is put together — the entry point, the calls the
-firmware makes and when, the job each file owns, and the handful of recipes that
-cover almost every change.
+How this face is put together — the entry point, the calls the firmware makes
+and when, the job each file owns, and the handful of recipes that cover almost
+every change. The project is the repository root.
 
 Pair this with [`README.md`](../README.md) (the *why* behind each row) and
 [`BUILDING.md`](../BUILDING.md) (how to compile and run it). When this doc and
@@ -295,8 +295,8 @@ generated module called `Rez`. The XML `id` becomes the symbol name:
 
 `manifest.xml` ties it together: the app id, the target `<iq:product>` list, the
 permissions (`SensorHistory` here), and `launcherIcon`. `monkey.jungle` is the
-build file — it points at the manifest and pins `sourcePath` / `resourcePath` so
-the root Protomolecule project next door never bleeds in.
+build file — it points at the manifest and sets `sourcePath` / `resourcePath` to
+`source` / `resources` (the defaults, stated explicitly).
 
 ---
 

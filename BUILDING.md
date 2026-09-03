@@ -25,8 +25,8 @@ build. The compiler alone is not enough — `monkeyc -d fenix8solar47mm` reads
 1. Install the extension.
 2. Command Palette (`Ctrl/Cmd+Shift+P`) → **Connect IQ: Install the Connect IQ SDK**.
 3. Command Palette → **Connect IQ: Download Devices** → tick **fenix 8 Solar 47mm**
-   (and any other device from `manifest.xml` you want: `fenix8solar51mm`,
-   `fenix843mm`, `fenix847mm`).
+   (and **fenix 8 Solar 51mm** if you want that target too — the two devices in
+   `manifest.xml`).
 
 **By hand:** download the SDK Manager from
 <https://developer.garmin.com/connect-iq/sdk/>, use it to install an SDK and the
@@ -40,20 +40,12 @@ Java 17+ must be on `PATH` (`monkeyc` is a Java program).
 
 Do this first — it is the real check that the code compiles and runs.
 
-> ⚠️ **Open the `dashboard/` folder as its own VS Code window**
-> (`File → Open Folder…` → `…/garmin-watchface-protomolecule/dashboard`).
->
-> If you open the **repository root** instead, the Monkey C extension builds the
-> root **Protomolecule** project (output `garminwatchfaceprotomolecule.prg`, a
-> long list of `Invalid device id` warnings, and `Undefined symbol ':SettingsTitle'`
-> / `':SourceHeartRate'` errors from `dashboard/source/settings/` — because the
-> Protomolecule build is compiling this project's code against Protomolecule's
-> string resources). That is the wrong project. Close it and open `dashboard/`.
-
-1. Command Palette → **Monkey C: Build Current Project**. Choose `fenix8solar47mm`.
+1. Open the repository root as a VS Code folder (`manifest.xml` is at the top
+   level, so the Monkey C extension finds the project automatically).
+2. Command Palette → **Monkey C: Build Current Project**. Choose `fenix8solar47mm`.
    On the first run it offers to generate a developer key — accept.
-2. If the build fails, the **Problems** panel shows the exact file and line.
-3. When it builds clean: Command Palette → **Monkey C: Run App in Simulator**
+3. If the build fails, the **Problems** panel shows the exact file and line.
+4. When it builds clean: Command Palette → **Monkey C: Run App in Simulator**
    (or `F5`). The face should match `docs/preview.png`.
 
 Things to check in the simulator:
@@ -74,10 +66,9 @@ Things to check in the simulator:
 Once A builds clean:
 
 ```sh
-cd dashboard
 export CIQ_SDK="$(ls -d ~/.Garmin/ConnectIQ/Sdks/*/ | sort -V | tail -1)"   # newest SDK
 ./build.sh                       # → bin/dashboard-fenix8solar47mm.prg
-./build.sh fenix847mm            # a different device from manifest.xml
+./build.sh fenix8solar51mm       # the other device from manifest.xml
 ./build.sh fenix8solar47mm -d    # debug build (needed to attach the simulator)
 ```
 
@@ -129,7 +120,7 @@ simulator.
 ```sh
 pip install Pillow                        # + a TrueType font, e.g. apt-get install fonts-dejavu-core
 python3 tools/preview.py preview.png                      # fenix8solar47mm
-python3 tools/preview.py --device fenix847mm out.png
+python3 tools/preview.py --device fenix8solar51mm out.png
 python3 tools/preview.py --all                            # one PNG per device
 python3 tools/preview.py --sleep out.png                  # burn-in variant
 ```
@@ -140,9 +131,9 @@ python3 tools/preview.py --sleep out.png                  # burn-in variant
 
 | Symptom | Fix |
 | --- | --- |
-| Build output is `garminwatchfaceprotomolecule.prg`, ~100 `Invalid device id` warnings, `Undefined symbol ':SettingsTitle'` / `':SourceHeartRate'` errors | You built the **root Protomolecule** project, not this one. Open the `dashboard/` folder on its own (see section A), or run `./build.sh` from inside `dashboard/`. |
 | `could not find the Connect IQ SDK` from `build.sh` | `export CIQ_SDK=…` pointing at the SDK root (the dir containing `bin/monkeyc`), or add `bin/` to `PATH`. |
 | `Cannot find device 'fenix8solar47mm'` | Device files not installed — **Connect IQ: Download Devices** in VS Code, or the SDK Manager. |
-| Build fails with `monkeyc` errors | The `dashboard/` source has never been through a compiler; first-build errors are expected. The Problems panel / stderr names the file and line. |
+| `Invalid device id 'fenix847mm'` / `'fenix843mm'` | Old, dropped targets — if you see these your checkout predates the manifest trim. The current manifest is `fenix8solar47mm` + `fenix8solar51mm` only. |
+| `Undefined symbol ':SomeString'` | A `Rez.Strings.*` reference with no matching entry in `resources/strings/strings.xml`. Usually a half-finished setting. |
 | Face loads but weather/graph are blank | Expected until the watch has synced weather and has sensor history. Not a bug — each missing input drops its element. |
 | Simulator shows nothing on the graph | **File → Simulate Data → Sensor History** (and pick the matching source in the face's settings). |

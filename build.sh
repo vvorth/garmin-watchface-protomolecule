@@ -3,7 +3,7 @@
 # Compile the watch face into a .prg you can side-load onto a watch.
 #
 #   ./build.sh                     # fenix8solar47mm, release build
-#   ./build.sh fenix847mm          # a different device
+#   ./build.sh fenix8solar51mm     # the other device in manifest.xml
 #   ./build.sh fenix8solar47mm -d  # debug build (needed for the simulator)
 #
 # Requires the Connect IQ SDK. See README.md for how to install it; point

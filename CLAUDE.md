@@ -4,59 +4,71 @@ Guidance for Claude Code working in this repository.
 
 ## What is here
 
-Two **independent** Connect IQ watch face projects. They share nothing but the
-git history — each has its own `manifest.xml` and `monkey.jungle`, and building
-one never touches the other.
+One Connect IQ watch face — **Dashboard**, a dense information face for the
+fenix 8 Solar (47 mm and 51 mm). The project is the repository root: its
+`manifest.xml`, `monkey.jungle`, `source/` and `resources/` sit at the top
+level. (It used to live in a `dashboard/` subdirectory beside an older
+"Protomolecule" face; both have been flattened away — ignore any lingering
+`dashboard/` path or "root project" mention and fix it if you see one.)
 
-| Path | Project |
-| --- | --- |
-| repository root | **Protomolecule** — the original face, published on the Connect IQ store. Broken "Expanse" bitmap fonts, Orbit / Circles / Sleep layouts, ~100 supported devices. |
-| `dashboard/` | **Dashboard** — a dense information face for the fenix 8 Solar 47 mm, added later. Self-contained; start here unless told otherwise. |
+`docs/brief.md` is the original request the face was built from, with the
+reference image beside it. Read it before changing the layout — each row exists
+for a stated reason.
 
-`dashboard/docs/brief.md` is the original request the Dashboard face was built
-from, with the reference image beside it. Read it before changing that face's
-layout — each row exists for a stated reason.
+## Keep docs in step with the code
+
+Prose in this repo is treated as part of the deliverable, not an afterthought.
+When a change makes any of the following stale, update it **in the same commit**:
+
+- `docs/internals.md` — architecture, lifecycle, module map, recipes
+- `README.md` — the row table, the settings list, the file tree
+- `BUILDING.md` — build/verify steps and the troubleshooting table
+- this file — anything under "Working on the face" and "Monkey C notes"
+- the mirror rule below: `tools/preview.py` tracks every `draw*` change
+
+If you notice existing docs already drifted from the code, say so and fix them
+even if it is outside the immediate task.
 
 ## Ground truth about the build
 
-**Neither project can be compiled in a sandboxed Claude Code session.** The
+**The face cannot be compiled in a sandboxed Claude Code session.** The
 `monkeyc` compiler ships only inside Garmin's SDK, which is not on any package
 registry and lives behind a licence click-through on `developer.garmin.com` — a
 host the session egress policy blocks (CONNECT returns 403). Do not try to route
 around it; say so and hand the user the build command instead.
 
-**The `dashboard/` face compiles and runs in the simulator** (fenix8solar47mm,
-SDK 9.2.x) as of the first build. Layout changes are then checked with the
-preview renderer below; treat a claim that a *specific later change* "works" on
-device as unverified until the user has re-run it.
+**The face compiles and runs in the simulator** (fenix8solar47mm, SDK 9.2.x) as
+of its first build. Layout changes are then checked with the preview renderer
+below; treat a claim that a *specific later change* "works" on device as
+unverified until the user has re-run it.
 
 Building, when an SDK is available:
 
 ```sh
-cd dashboard && ./build.sh                   # → bin/dashboard-fenix8solar47mm.prg
-cd dashboard && ./build.sh fenix8solar51mm   # the other device from manifest.xml
+./build.sh                     # → bin/dashboard-fenix8solar47mm.prg
+./build.sh fenix8solar51mm     # the other device from manifest.xml
 ```
 
 `build.sh` locates the SDK (`PATH`, `$CIQ_SDK`, or the SDK Manager's default
 directory), generates the signing key on first run, and calls `monkeyc`.
-`dashboard/README.md` has the SDK install steps and the raw command.
+`README.md` has the SDK install steps and the raw command.
 
-## Working on dashboard/
+## Working on the face
 
-**`dashboard/docs/internals.md` is the full architecture walkthrough** — entry
-point, framework lifecycle, module map, the settings/data-refresh model, and
-change recipes. Read it before a non-trivial change; keep it current when the
-structure shifts.
+**`docs/internals.md` is the full architecture walkthrough** — entry point,
+framework lifecycle, module map, the settings/data-refresh model, and change
+recipes. Read it before a non-trivial change; keep it current when the structure
+shifts.
 
 - **Layout lives in `source/Theme.mc`** as fractions of screen height, measured
   off the reference image. Nothing is hard coded to 260×260.
 - **`tools/preview.py` renders a PNG** so layout changes can be checked without
   the simulator:
   ```sh
-  python3 dashboard/tools/preview.py preview.png                 # fenix8solar47mm
-  python3 dashboard/tools/preview.py --device fenix8solar51mm out.png
-  python3 dashboard/tools/preview.py --all                       # one PNG per device
-  python3 dashboard/tools/preview.py --sleep out.png             # burn-in variant
+  python3 tools/preview.py preview.png                 # fenix8solar47mm
+  python3 tools/preview.py --device fenix8solar51mm out.png
+  python3 tools/preview.py --all                       # one PNG per device
+  python3 tools/preview.py --sleep out.png             # burn-in variant
   ```
   It is a mock, not an emulator — fixed sample data, DejaVu standing in for the
   Garmin system fonts (but the real Chivo for the clock). It **parses
@@ -83,17 +95,11 @@ structure shifts.
   sensor must drop its element, never crash the face.
 - **Colours come from the MIP 64-colour palette** — each channel one of `0x00`,
   `0x55`, `0xAA`, `0xFF`. Anything else is dithered by the firmware and looks
-  grainy on the watch.
+  grainy on the watch. One deliberate exception: `Theme.NOTIFICATION_ON`
+  (`0xFF8000`), a user-chosen orange — leave it unless asked.
 - **Weather conditions are matched on raw integers** in `Icons.forCondition`,
   with the `Weather.CONDITION_*` name in a comment on each. That is deliberate:
   there are ~50 of them and a device SDK missing one would break the build.
-
-## Working on the root project
-
-Leave it alone unless asked. It is a live published app: changing its
-`manifest.xml`, app id, or layouts affects real users. Note `.gitattributes`
-sets `manifest.xml merge=ours`, so merges deliberately keep the local device
-list.
 
 ## Monkey C notes
 

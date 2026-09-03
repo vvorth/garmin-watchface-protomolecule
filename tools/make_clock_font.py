@@ -2,11 +2,11 @@
 """Generate the AngelCode BMFont pair Connect IQ needs for the clock digits.
 
 Connect IQ has no runtime font rasteriser, so a custom face has to ship as a
-`.fnt` descriptor plus a `_0.png` glyph atlas (the format the Protomolecule
-project next door also uses). This bakes the Chivo digits into that pair.
+`.fnt` descriptor plus a `_0.png` glyph atlas. This bakes the Chivo digits into
+that pair.
 
     python3 tools/make_clock_font.py                     # default: 66 px, weight 700
-    python3 tools/make_clock_font.py --px 72 --weight 800
+    python3 tools/make_clock_font.py --px 95 --weight 700 --name Chivo95
     python3 tools/make_clock_font.py --out resources-round-280x280/fonts --name Chivo72
 
 Chivo is under the SIL Open Font License; tools/fonts/OFL.txt is the licence and
@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(os.path.abspath(__file__))
 TTF = os.path.join(HERE, "fonts", "Chivo[wght].ttf")
 CHARSET = "0123456789 "
-ATLAS = 256  # page size, matches the Protomolecule fonts; digits use far less
+ATLAS = 256  # page size; the digits use only a small corner of it
 
 
 def build(px, weight, out_dir, name):
@@ -99,7 +99,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--px", type=int, default=66, help="nominal em size (default 66)")
     ap.add_argument("--weight", type=int, default=700, help="Chivo weight 100-900 (default 700)")
-    ap.add_argument("--out", default="resources/fonts", help="output dir, relative to dashboard/")
+    ap.add_argument("--out", default="resources/fonts", help="output dir, relative to the repo root")
     ap.add_argument("--name", default=None, help="font base name (default Chivo<px>)")
     args = ap.parse_args()
     build(args.px, args.weight, args.out, args.name or ("Chivo%d" % args.px))

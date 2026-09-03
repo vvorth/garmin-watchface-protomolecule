@@ -12,9 +12,6 @@ The design this was built to, and the original brief behind each row, are in
 [`docs/brief.md`](docs/brief.md); how the code works, end to end, is in
 [`docs/internals.md`](docs/internals.md).
 
-This lives beside the existing Protomolecule face in the repository root; the
-two projects are independent and neither one's build touches the other.
-
 ---
 
 ## What is on the face
@@ -70,7 +67,6 @@ to install an SDK and the device, and add the SDK's `bin/` to `PATH`.
 ### 2. Build
 
 ```sh
-cd dashboard
 ./build.sh                     # fenix8solar47mm, release build → bin/dashboard-fenix8solar47mm.prg
 ./build.sh fenix8solar51mm     # the other device in manifest.xml
 ./build.sh fenix8solar47mm -d  # debug build, needed by the simulator
@@ -109,7 +105,7 @@ commit it.
 
 ### Continuous integration
 
-`.github/workflows/dashboard.yml` builds the `.prg` and uploads it as a run
+`.github/workflows/build.yml` builds the `.prg` and uploads it as a run
 artifact. Because Garmin publishes no stable unauthenticated download for the
 SDK or the device files, the workflow needs two repository variables pointing at
 copies you host yourself (`CIQ_SDK_URL`, `CIQ_DEVICES_URL`); the file's header
@@ -220,11 +216,11 @@ the firmware and looks grainy on the watch.
 ### The clock font
 
 The reference clock is Chivo. Connect IQ has no runtime font rasteriser, so it
-ships as an AngelCode bitmap font (`resources/fonts/Chivo76.fnt` + `_0.png`
+ships as an AngelCode bitmap font (`resources/fonts/Chivo95.fnt` + `_0.png`
 atlas, declared in `fonts.xml` as `Rez.Fonts.ClockFont`). Regenerate it with:
 
 ```sh
-python3 tools/make_clock_font.py --px 76 --weight 700
+python3 tools/make_clock_font.py --px 95 --weight 700
 ```
 
 from `tools/fonts/Chivo[wght].ttf` (SIL OFL, licence alongside it). Only `0`-`9`

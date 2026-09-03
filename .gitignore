@@ -4,11 +4,10 @@
 *.iml
 *.code-workspace
 .vscode
-# dashboard/ build output and signing key
-dashboard/bin/
+# signing key
 *.der
 *.pem
 __pycache__/
-# dashboard/ preview renders (docs/preview.png is committed on purpose)
-dashboard/tools/preview-*.png
-dashboard/preview.png
+# preview renders (docs/preview.png is committed on purpose)
+/preview.png
+/tools/preview-*.png

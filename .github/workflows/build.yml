@@ -1,11 +1,11 @@
-# Builds dashboard/ into a .prg and attaches it to the run as an artifact.
+# Builds the face into a .prg and attaches it to the run as an artifact.
 #
 # Garmin does not publish a stable, unauthenticated URL for the Connect IQ SDK
 # or for the per-device definitions, and both are behind a licence click-through
 # — so this workflow cannot fetch them on its own. Give it the two URLs once and
 # it will build on every push:
 #
-#   1. Install the SDK locally (see dashboard/README.md).
+#   1. Install the SDK locally (see README.md).
 #   2. Repository Settings -> Secrets and variables -> Actions -> Variables:
 #        CIQ_SDK_URL      a URL serving the Linux SDK zip
 #        CIQ_DEVICES_URL  a URL serving a zip of ~/.Garmin/ConnectIQ/Devices
@@ -13,13 +13,17 @@
 #
 # Without those variables the workflow stops early with an explanation rather
 # than failing halfway through.
-name: dashboard
+name: build
 
 on:
   push:
     paths:
-      - "dashboard/**"
-      - ".github/workflows/dashboard.yml"
+      - "source/**"
+      - "resources/**"
+      - "manifest.xml"
+      - "monkey.jungle"
+      - "build.sh"
+      - ".github/workflows/build.yml"
   workflow_dispatch:
     inputs:
       device:
@@ -80,11 +84,11 @@ jobs:
           DEVICE: ${{ inputs.device || 'fenix8solar47mm' }}
         run: |
           chmod +x "$CIQ_SDK"/bin/* 2>/dev/null || true
-          ./dashboard/build.sh "$DEVICE"
+          ./build.sh "$DEVICE"
 
       - uses: actions/upload-artifact@v4
         if: env.skip != 'true'
         with:
           name: dashboard-prg
-          path: dashboard/bin/*.prg
+          path: bin/*.prg
           if-no-files-found: error
