@@ -1,6 +1,5 @@
 import Toybox.Graphics;
 import Toybox.Lang;
-import Toybox.Math;
 
 //! The three progress arcs that hug the bottom edge of the screen.
 //!
@@ -63,19 +62,12 @@ module Arcs {
     strokeArc(dc, cx, cy, r, Theme.ARC_FILL_PEN, from, from + length);
   }
 
-  //! One arc segment with rounded ends. Dc.drawArc has no cap style, so a disc
-  //! the width of the stroke is dropped on each end. Uses the current colour.
+  //! One arc segment. `fromDeg`/`toDeg` are Garmin degrees; the direction is
+  //! whichever way is the short way between them. Uses the current colour.
   function strokeArc(dc as Graphics.Dc, cx as Numeric, cy as Numeric, r as Numeric, pen as Number, fromDeg as Numeric, toDeg as Numeric) as Void {
     dc.setPenWidth(pen);
     var direction = toDeg > fromDeg ? Graphics.ARC_COUNTER_CLOCKWISE : Graphics.ARC_CLOCKWISE;
     dc.drawArc(cx, cy, r, direction, fromDeg, toDeg);
-    cap(dc, cx, cy, r, pen, fromDeg);
-    cap(dc, cx, cy, r, pen, toDeg);
-  }
-
-  function cap(dc as Graphics.Dc, cx as Numeric, cy as Numeric, r as Numeric, pen as Number, deg as Numeric) as Void {
-    var a = Math.toRadians(deg);
-    dc.fillCircle(cx + r * Math.cos(a), cy - r * Math.sin(a), pen / 2.0);
   }
 
   function clamp(fraction as Float) as Float {

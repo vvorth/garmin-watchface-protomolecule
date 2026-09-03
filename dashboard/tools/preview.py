@@ -85,6 +85,7 @@ SAMPLE = {
     "graph_is_percentage": False,
     "hours": "11",
     "minutes": "29",
+    "clock_24h": True,     # True: gap on the centre line. False: block centred.
     "hour_color": None,    # None -> Theme default (white); or a T[...] key
     "minute_color": None,  # None -> Theme default (cyan)
     "body_battery": 35,
@@ -270,12 +271,7 @@ class Face:
         self.d.arc(box, start=a, end=b, fill=color, width=max(1, int(width * self.s)))
 
     def stroke_arc(self, x, y, r, color, garmin_start, garmin_end, width):
-        """An arc with rounded ends (Dc.drawArc has no cap style, so drop a disc
-        the width of the stroke on each end)."""
         self.arc(x, y, r, color, garmin_start, garmin_end, width)
-        for deg in (garmin_start, garmin_end):
-            a = math.radians(deg)
-            self.circle(x + r * math.cos(a), y - r * math.sin(a), width / 2.0, color)
 
     def text(self, x, y, px, string, color, align="left", valign="middle", family="ui"):
         f = font(px, family)
@@ -358,10 +354,20 @@ class Face:
         hours, minutes = SAMPLE["hours"], SAMPLE["minutes"]
         hcol = TEXT_DIM if dim else (rgb(T[SAMPLE["hour_color"]]) if SAMPLE["hour_color"] else HOURS)
         mcol = TEXT_DIM if dim else (rgb(T[SAMPLE["minute_color"]]) if SAMPLE["minute_color"] else MINUTES)
-        half_gap = self.w * 0.010
+        gap = self.w * 0.020
         y = TIME_Y * self.h + offset_y
-        self.text(self.cx - half_gap, y, self.clock_font, hours, hcol, align="right", family="clock")
-        self.text(self.cx + half_gap, y, self.clock_font, minutes, mcol, align="left", family="clock")
+
+        hours_right = self.cx - gap / 2.0
+        minutes_left = self.cx + gap / 2.0
+        if not SAMPLE["clock_24h"]:
+            hw = self.text_width(hours, self.clock_font, "clock")
+            mw = self.text_width(minutes, self.clock_font, "clock")
+            left = self.cx - (hw + gap + mw) / 2.0
+            hours_right = left + hw
+            minutes_left = left + hw + gap
+
+        self.text(hours_right, y, self.clock_font, hours, hcol, align="right", family="clock")
+        self.text(minutes_left, y, self.clock_font, minutes, mcol, align="left", family="clock")
 
     def draw_status_row(self):
         y = STATUS_Y * self.h
@@ -378,7 +384,7 @@ class Face:
         # grow it to fill between the separator above and the arc below, 1 px clear.
         top = SEP_5_Y * self.h + 1
         bottom = self.cy + self.radius - ARC_EDGE_INSET - ARC_FILL_PEN - 1
-        radius = (bottom - top) / Icons.NOTIFICATION_SPAN
+        radius = (bottom - top) / Icons.NOTIFICATION_SPAN * 0.95
         y = top + radius * 0.75
 
         count = SAMPLE["notifications"]

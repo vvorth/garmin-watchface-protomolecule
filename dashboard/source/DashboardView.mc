@@ -212,11 +212,11 @@ class DashboardView extends WatchUi.WatchFace {
     Graph.draw(dc, mWidth, mCenterX, top, bottom, values, Data.graphIsPercentage(source), Theme.GRAPH);
   }
 
-  //! Hours and minutes, no colon, each in its own configurable colour. The gap
-  //! between them straddles the screen centre line: hours are right-aligned to
-  //! just left of centre, minutes left-aligned just right of it, so the join
-  //! stays put whether the hour is one digit or two. 24-hour mode keeps the
-  //! leading zero, 12-hour mode drops it. `offsetY` shifts it for burn-in.
+  //! Hours and minutes, no colon, each in its own configurable colour. 24-hour
+  //! mode keeps the leading zero and puts the gap between the two on the screen
+  //! centre line (so the join sits still as the minutes change). 12-hour mode
+  //! drops the leading zero and centres the whole `H MM` block instead, so a
+  //! one-digit hour still looks balanced. `offsetY` shifts it for burn-in.
   hidden function drawTime(dc as Graphics.Dc, offsetY as Numeric) as Void {
     var clock = System.getClockTime();
     var is24Hour = System.getDeviceSettings().is24Hour;
@@ -231,13 +231,24 @@ class DashboardView extends WatchUi.WatchFace {
     var hours = is24Hour ? hour.format("%02d") : hour.format("%d");
     var minutes = clock.min.format("%02d");
 
-    var halfGap = mWidth * 0.010;
+    var gap = mWidth * 0.020;
     var y = Layout.TIME_Y * mHeight + offsetY;
 
+    // 24h: gap centred on the screen. 12h: whole block centred.
+    var hoursRightX = mCenterX - gap / 2.0;
+    var minutesLeftX = mCenterX + gap / 2.0;
+    if (!is24Hour) {
+      var hoursWidth = dc.getTextDimensions(hours, mTimeFont)[0];
+      var minutesWidth = dc.getTextDimensions(minutes, mTimeFont)[0];
+      var left = mCenterX - (hoursWidth + gap + minutesWidth) / 2.0;
+      hoursRightX = left + hoursWidth;
+      minutesLeftX = left + hoursWidth + gap;
+    }
+
     dc.setColor(Data.hourColor(), Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mCenterX - halfGap, y, mTimeFont, hours, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.drawText(hoursRightX, y, mTimeFont, hours, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
     dc.setColor(Data.minuteColor(), Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mCenterX + halfGap, y, mTimeFont, minutes, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.drawText(minutesLeftX, y, mTimeFont, minutes, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
   //! Body Battery on the left, do-not-disturb next, alarm dead centre, steps on
@@ -268,7 +279,8 @@ class DashboardView extends WatchUi.WatchFace {
   hidden function drawBatteryRow(dc as Graphics.Dc, settings as System.DeviceSettings) as Void {
     var top = Layout.SEP_5_Y * mHeight + 1;
     var bottom = mCenterY + mRadius - Theme.ARC_EDGE_INSET - Theme.ARC_FILL_PEN - 1; // 1 px inside the fill arc
-    var radius = (bottom - top) / Icons.NOTIFICATION_SPAN;
+    // 0.95: a touch smaller than the full slot. Top stays pinned to `top`.
+    var radius = (bottom - top) / Icons.NOTIFICATION_SPAN * 0.95;
     var y = top + radius * 0.75;
 
     var count = settings.notificationCount == null ? 0 : settings.notificationCount;
