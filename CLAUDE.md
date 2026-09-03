@@ -44,15 +44,22 @@ directory), generates the signing key on first run, and calls `monkeyc`.
 
 - **Layout lives in `source/Theme.mc`** as fractions of screen height, measured
   off the reference image. Nothing is hard coded to 260×260.
-- **`tools/preview.py` mirrors that geometry in Python** and renders a PNG, so
-  layout changes can be checked without the simulator:
+- **`tools/preview.py` renders a PNG** so layout changes can be checked without
+  the simulator:
   ```sh
-  python3 dashboard/tools/preview.py preview.png
+  python3 dashboard/tools/preview.py preview.png            # fenix8solar47mm
+  python3 dashboard/tools/preview.py --device fenix847mm out.png
+  python3 dashboard/tools/preview.py --all                  # one PNG per device
+  python3 dashboard/tools/preview.py --sleep out.png        # burn-in variant
   ```
-  It is a mock, not an emulator — fixed sample data, approximate font metrics.
-  **When you change a layout constant in `Theme.mc`, change the matching one at
-  the top of `preview.py`.** They are deliberately kept as mirror images and
-  silently drift apart otherwise.
+  It is a mock, not an emulator — fixed sample data, DejaVu standing in for the
+  proprietary Garmin fonts. It **parses `source/Theme.mc` at run time**, so the
+  colour palette and the `Layout` fractions never need copying by hand. What is
+  still mirrored by hand is the per-row geometry inside the `draw*` methods (the
+  `0.042`, `0.395`, … literals): **when you touch a `draw` method in
+  `DashboardView.mc` / `Arcs.mc` / `Graph.mc` / `Icons.mc`, change the matching
+  method in `preview.py`.** For transflective devices it snaps every pixel to
+  the 64-colour MIP palette, so dithering shows up in the preview.
 - **No bitmap assets.** Every icon is drawn from primitives in `source/Icons.mc`
   and scales with the screen. Watch faces have a small fixed heap; keep it that
   way.

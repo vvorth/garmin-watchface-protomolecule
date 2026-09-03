@@ -119,19 +119,28 @@ failing.
 PNG:
 
 ```sh
-pip install Pillow
-python3 tools/preview.py preview.png
+pip install Pillow                       # plus a TrueType font: apt-get install fonts-dejavu-core
+python3 tools/preview.py preview.png                     # fenix8solar47mm
+python3 tools/preview.py --device fenix8solar51mm out.png
+python3 tools/preview.py --all                           # tools/preview-<device>.png for each
+python3 tools/preview.py --sleep out.png                 # the burn-in / sleep face
+python3 tools/preview.py --scale 3 out.png               # 3x nearest-neighbour zoom
 ```
 
-It is a drawing mock, not an emulator — it uses fixed sample values and
-approximate system-font metrics. It exists so you can iterate on the layout
-fractions in `source/Theme.mc` and see the result immediately. The real check is
-still `monkeydo bin/dashboard-fenix8solar47mm.prg fenix8solar47mm` against a
-debug build.
+It is a drawing mock, not an emulator — fixed sample values, and DejaVu Sans
+Bold standing in for the proprietary Garmin system fonts. What it gets right:
+it renders at each device's real resolution, and for the transflective (MIP)
+devices it snaps every pixel to the 64-colour panel palette, so a colour that
+would dither on the watch dithers here too.
 
-If you change a layout fraction in `source/Theme.mc`, change the matching
-constant at the top of `tools/preview.py` too — they are deliberately kept as
-mirror images.
+The colour palette and the `Layout` fractions are **read out of
+`source/Theme.mc`** when the script runs, so those never drift. The per-row
+geometry inside the `draw*` methods is still a hand copy of
+`source/DashboardView.mc` (and `Arcs.mc` / `Graph.mc` / `Icons.mc`) — keep the
+two in step when you edit a `draw` method.
+
+The real check is still `monkeydo bin/dashboard-fenix8solar47mm.prg
+fenix8solar47mm` against a debug build.
 
 ---
 

@@ -9,3 +9,6 @@ dashboard/bin/
 *.der
 *.pem
 __pycache__/
+# dashboard/ preview renders (docs/preview.png is committed on purpose)
+dashboard/tools/preview-*.png
+dashboard/preview.png

@@ -1,317 +1,651 @@
 #!/usr/bin/env python3
-"""Render a static preview of the watch face without the Connect IQ simulator.
+"""Render a static preview of the Dashboard watch face without the Connect IQ simulator.
 
-This mirrors the geometry in source/DashboardView.mc one-to-one, so it is a
-quick way to check spacing and proportions after changing the fractions in
-source/Theme.mc. It is a drawing mock, not an emulator: the system font metrics
-are approximations of the ones a 260x260 fenix reports.
+The colour palette and the vertical layout fractions are read straight out of
+``source/Theme.mc`` at run time, so this script cannot drift away from the face
+the way a hand-copied table would. Everything else here is a deliberate mock:
 
+* The Garmin system fonts are proprietary. They are approximated with DejaVu Sans
+  Bold and a per-font size table calibrated by eye against the simulator.
+* The sample data (weather, graph trace, step count, ...) is fixed, see SAMPLE.
+* MIP anti-aliasing is approximated by rendering large and box-filtering down.
+
+What it *does* get right: the geometry is a line-by-line mirror of
+``source/DashboardView.mc`` / ``Arcs.mc`` / ``Graph.mc`` / ``Icons.mc``, it runs
+at the real pixel resolution of each target device, and for the transflective
+(MIP) devices it snaps every pixel to the 64-colour palette the panel can
+actually show -- so colours that would dither on the watch look dithered here.
+
+Usage::
+
+    python3 tools/preview.py                              # preview.png, fenix8solar47mm
     python3 tools/preview.py out.png
+    python3 tools/preview.py --device fenix8solar51mm out.png
+    python3 tools/preview.py --scale 3 out.png            # 3x nearest-neighbour zoom
+    python3 tools/preview.py --sleep out.png              # burn-in / sleep variant
+    python3 tools/preview.py --no-quantize out.png        # skip the MIP palette snap
+    python3 tools/preview.py --all                        # every device -> tools/preview-<device>.png
 """
 
+import argparse
 import math
+import os
+import re
 import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
-W = H = 260
-CX = CY = W // 2
-R = W // 2
+HERE = os.path.dirname(os.path.abspath(__file__))
+THEME_MC = os.path.join(HERE, os.pardir, "source", "Theme.mc")
 
-FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+# --- target devices ---------------------------------------------------------
+# (width, height, panel).  "mip" = transflective 64-colour memory-in-pixel,
+# "amoled" = full colour.  Sizes are the documented screen resolutions; the
+# face derives everything else from them, which is the point of previewing more
+# than one.
+DEVICES = {
+    "fenix8solar47mm": (260, 260, "mip"),
+    "fenix8solar51mm": (280, 280, "mip"),
+    "fenix843mm": (390, 390, "amoled"),
+    "fenix847mm": (454, 454, "amoled"),
+}
+DEFAULT_DEVICE = "fenix8solar47mm"
 
-# Rough stand-ins for the Garmin system fonts on a 260x260 screen, in the same
-# order as Fonts.TIME / Fonts.ROW (largest first).
-TIME_FONTS = [85, 65, 50, 34, 32]
-ROW_FONTS = [27, 23, 21, 16]
+FONT_CANDIDATE_PATHS = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+]
 
-# source/Theme.mc
-BACKGROUND = (0, 0, 0)
-DATE = (0, 255, 0)
-HOURS = (255, 255, 255)
-MINUTES = (0, 255, 255)
-TEXT = (255, 255, 255)
-TEXT_DIM = (170, 170, 170)
-SEPARATOR = (85, 85, 85)
-GRAPH = (0, 255, 0)
-OFF = (85, 85, 85)
-DND_ON = (255, 0, 0)
-ALARM_ON = (255, 255, 0)
-NOTIFICATION_ON = (255, 85, 0)
-ARC_BODY_BATTERY = (0, 255, 0)
-ARC_DEVICE_BATTERY = (0, 255, 255)
-ARC_DAYLIGHT = (255, 255, 0)
+# Stand-ins for the Garmin system fonts, as pixel heights on a 260 px screen and
+# in the same order as Fonts.time() / Fonts.row() in source/Fonts.mc (largest
+# first).  Scaled to the real screen height at run time.
+TIME_FONTS_260 = [86, 66, 46, 34, 32]
+ROW_FONTS_260 = [27, 24, 21, 17]
 
-# source/Theme.mc, module Layout
-DATE_Y = 0.078
-SEP_1_Y = 0.12
-WEATHER_Y = 0.182
-SEP_2_Y = 0.238
-GRAPH_TOP_Y = 0.252
-GRAPH_BOTTOM_Y = 0.348
-SEP_3_Y = 0.364
-TIME_Y = 0.508
-SEP_4_Y = 0.652
-STATUS_Y = 0.748
-SEP_5_Y = 0.828
-BATTERY_Y = 0.898
-SEPARATOR_RADIUS = 0.94
+SUPERSAMPLE = 4  # render this many times larger, then filter down
 
-ARC_LEFT_FROM, ARC_LEFT_TO = 240, 200
-ARC_CENTER, ARC_CENTER_SPREAD = 270, 25
-ARC_RIGHT_FROM, ARC_RIGHT_TO = 300, 340
-
-SCALE = 4  # supersampling, purely a preview nicety
-
-
-def font(size):
-    return ImageFont.truetype(FONT_PATH, int(size * SCALE * 0.78))
-
-
-def text_size(draw, string, size):
-    box = draw.textbbox((0, 0), string, font=font(size))
-    return box[2] - box[0], size * SCALE
+# Fixed sample readings the mock draws.
+SAMPLE = {
+    "date": "Thu 3 Sep",
+    "temp": "13°",
+    "precip": "40%",
+    "condition": 1,  # Icons.PARTLY_CLOUDY
+    "high": "17°",
+    "low": "8°",
+    "graph": [58, 61, 55, None, 62, 66, 72, 95, 90, 88, 92, 87, 91, 86,
+              89, 84, 88, 83, 86, 78, 74, 70, 66, 63, 60, 62, 64, 61, 59],
+    "graph_is_percentage": False,
+    "hours": "11",
+    "minutes": "29",
+    "body_battery": 35,
+    "dnd": True,
+    "alarm": True,
+    "steps": "6.8k",
+    "battery_days": "12d",
+    "battery_pct": "64%",
+    "notifications": 1,
+    "arc_body_battery": 0.35,
+    "arc_device_battery": 0.64,
+    "arc_daylight": 0.22,
+}
 
 
-def fit(draw, candidates, sample, max_width, max_height):
-    for size in candidates:
-        w, h = text_size(draw, sample, size)
-        if w <= max_width * SCALE and h <= max_height * SCALE:
-            return size
-    return candidates[-1]
+# --- source/Theme.mc -------------------------------------------------------
+def parse_theme(path):
+    """Pull every ``const NAME as T = VALUE;`` out of Theme.mc.
+
+    Theme.mc holds two modules (Theme, Layout) whose constant names do not
+    collide, so a flat dict is enough.  Handles hex (0x..), float and int
+    literals and ignores trailing ``// comments``.
+    """
+    with open(path) as fh:
+        text = fh.read()
+    out = {}
+    for m in re.finditer(r"const\s+(\w+)\s+as\s+[\w.<>]+\s*=\s*([^;]+);", text):
+        name = m.group(1)
+        raw = m.group(2).split("//")[0].strip()
+        if re.fullmatch(r"0x[0-9A-Fa-f]+", raw):
+            out[name] = int(raw, 16)
+        elif re.fullmatch(r"-?\d+\.\d+", raw):
+            out[name] = float(raw)
+        elif re.fullmatch(r"-?\d+", raw):
+            out[name] = int(raw)
+    return out
 
 
-def chord(y):
-    r = R * SEPARATOR_RADIUS
-    dy = y - CY
-    squared = r * r - dy * dy
-    return 0 if squared <= 0 else math.sqrt(squared)
+T = parse_theme(THEME_MC)
 
 
-class Canvas:
-    """Thin wrapper so the drawing code reads like the Monkey C Dc calls."""
+def rgb(value):
+    return ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
 
-    def __init__(self):
-        self.image = Image.new("RGB", (W * SCALE, H * SCALE), BACKGROUND)
-        self.d = ImageDraw.Draw(self.image)
+
+# Colours (source/Theme.mc, module Theme)
+BACKGROUND = rgb(T["BACKGROUND"])
+DATE = rgb(T["DATE"])
+HOURS = rgb(T["HOURS"])
+MINUTES = rgb(T["MINUTES"])
+TEXT = rgb(T["TEXT"])
+TEXT_DIM = rgb(T["TEXT_DIM"])
+SEPARATOR = rgb(T["SEPARATOR"])
+GRAPH = rgb(T["GRAPH"])
+OFF = rgb(T["OFF"])
+DND_ON = rgb(T["DND_ON"])
+ALARM_ON = rgb(T["ALARM_ON"])
+NOTIFICATION_ON = rgb(T["NOTIFICATION_ON"])
+ARC_BODY_BATTERY = rgb(T["ARC_BODY_BATTERY"])
+ARC_DEVICE_BATTERY = rgb(T["ARC_DEVICE_BATTERY"])
+ARC_DAYLIGHT = rgb(T["ARC_DAYLIGHT"])
+
+# Layout fractions (source/Theme.mc, module Layout)
+DATE_Y = T["DATE_Y"]
+SEP_1_Y = T["SEP_1_Y"]
+WEATHER_Y = T["WEATHER_Y"]
+SEP_2_Y = T["SEP_2_Y"]
+GRAPH_TOP_Y = T["GRAPH_TOP_Y"]
+GRAPH_BOTTOM_Y = T["GRAPH_BOTTOM_Y"]
+SEP_3_Y = T["SEP_3_Y"]
+TIME_Y = T["TIME_Y"]
+SEP_4_Y = T["SEP_4_Y"]
+STATUS_Y = T["STATUS_Y"]
+SEP_5_Y = T["SEP_5_Y"]
+BATTERY_Y = T["BATTERY_Y"]
+SEPARATOR_RADIUS = T["SEPARATOR_RADIUS"]
+ARC_LEFT_FROM = T["ARC_LEFT_FROM"]
+ARC_LEFT_TO = T["ARC_LEFT_TO"]
+ARC_CENTER = T["ARC_CENTER"]
+ARC_CENTER_SPREAD = T["ARC_CENTER_SPREAD"]
+ARC_RIGHT_FROM = T["ARC_RIGHT_FROM"]
+ARC_RIGHT_TO = T["ARC_RIGHT_TO"]
+
+
+def find_font_path():
+    for path in FONT_CANDIDATE_PATHS:
+        if os.path.exists(path):
+            return path
+    raise SystemExit(
+        "no usable TrueType font found. Install one, e.g.\n"
+        "  sudo apt-get install fonts-dejavu-core\n"
+        "or edit FONT_CANDIDATE_PATHS at the top of this script."
+    )
+
+
+FONT_PATH = find_font_path()
+_font_cache = {}
+
+
+def font(px):
+    """`px` is a screen-pixel height; the returned face is SUPERSAMPLE times
+    that, since all drawing happens on the supersampled canvas."""
+    key = int(px)
+    if key not in _font_cache:
+        # DejaVu's cap height sits a little low; 0.80 lands close to Garmin.
+        _font_cache[key] = ImageFont.truetype(FONT_PATH, max(1, int(px * 0.80 * SUPERSAMPLE)))
+    return _font_cache[key]
+
+
+# --- the renderer --------------------------------------------------------
+class Face:
+    """One rendered face.  The drawing methods mirror source/DashboardView.mc;
+    coordinates are in screen pixels and scaled up by SUPERSAMPLE on the way to
+    Pillow."""
+
+    def __init__(self, device):
+        self.w, self.h, self.panel = DEVICES[device]
+        self.device = device
+        self.cx = self.w / 2
+        self.cy = self.h / 2
+        self.radius = min(self.w, self.h) / 2
+        self.s = SUPERSAMPLE
+        self.img = Image.new("RGB", (self.w * self.s, self.h * self.s), BACKGROUND)
+        self.d = ImageDraw.Draw(self.img)
+
+        scale = self.h / 260.0
+        self.time_fonts = [v * scale for v in TIME_FONTS_260]
+        self.row_fonts = [v * scale for v in ROW_FONTS_260]
+
+        # source/DashboardView.mc onLayout()
+        time_band = (SEP_4_Y - SEP_3_Y) * self.h
+        self.time_font = self.fit(self.time_fonts, "88 88",
+                                  self.chord(TIME_Y * self.h) * 2, time_band)
+        self.row_font = self.fit(self.row_fonts, "88.8k", self.w * 0.3, self.h * 0.095)
+        self.small_font = self.fit(self.row_fonts, "888% 888°",
+                                   self.w * 0.44, self.h * 0.078)
+        self.badge_font = self.fit(self.row_fonts, "88", self.w * 0.06, self.h * 0.055)
+
+    # -- primitives (Pillow, supersampled) --------------------------------
+    def _xy(self, *vals):
+        return [v * self.s for v in vals]
 
     def line(self, x1, y1, x2, y2, color, width=1):
-        self.d.line([x1 * SCALE, y1 * SCALE, x2 * SCALE, y2 * SCALE], fill=color, width=int(width * SCALE))
+        self.d.line(self._xy(x1, y1, x2, y2), fill=color, width=max(1, int(width * self.s)))
 
     def rect(self, x, y, w, h, color):
-        self.d.rectangle([x * SCALE, y * SCALE, (x + w) * SCALE, (y + h) * SCALE], fill=color)
+        self.d.rectangle(self._xy(x, y, x + w, y + h), fill=color)
 
     def circle(self, x, y, r, color):
-        self.d.ellipse([(x - r) * SCALE, (y - r) * SCALE, (x + r) * SCALE, (y + r) * SCALE], fill=color)
+        self.d.ellipse(self._xy(x - r, y - r, x + r, y + r), fill=color)
 
     def ring(self, x, y, r, color, width):
-        self.d.ellipse(
-            [(x - r) * SCALE, (y - r) * SCALE, (x + r) * SCALE, (y + r) * SCALE],
-            outline=color,
-            width=int(width * SCALE),
-        )
+        self.d.ellipse(self._xy(x - r, y - r, x + r, y + r),
+                       outline=color, width=max(1, int(width * self.s)))
 
     def polygon(self, points, color):
-        self.d.polygon([(x * SCALE, y * SCALE) for x, y in points], fill=color)
+        self.d.polygon([c * self.s for p in points for c in p], fill=color)
 
-    def rounded(self, x, y, w, h, radius, color, filled=True, width=1):
-        box = [x * SCALE, y * SCALE, (x + w) * SCALE, (y + h) * SCALE]
+    def rounded(self, x, y, w, h, rad, color, filled=True, width=1):
+        box = self._xy(x, y, x + w, y + h)
         if filled:
-            self.d.rounded_rectangle(box, radius=radius * SCALE, fill=color)
+            self.d.rounded_rectangle(box, radius=rad * self.s, fill=color)
         else:
-            self.d.rounded_rectangle(box, radius=radius * SCALE, outline=color, width=int(width * SCALE))
+            self.d.rounded_rectangle(box, radius=rad * self.s, outline=color,
+                                     width=max(1, int(width * self.s)))
 
-    def arc(self, x, y, r, color, start, end, width):
-        """Garmin degrees: counter clockwise from 3 o'clock."""
-        box = [(x - r) * SCALE, (y - r) * SCALE, (x + r) * SCALE, (y + r) * SCALE]
-        a, b = sorted((-start, -end))
-        self.d.arc(box, start=a, end=b, fill=color, width=int(width * SCALE))
+    def arc(self, x, y, r, color, garmin_start, garmin_end, width):
+        """drawArc: Garmin measures degrees counter-clockwise from 3 o'clock,
+        Pillow clockwise, so negate and sort."""
+        box = self._xy(x - r, y - r, x + r, y + r)
+        a, b = sorted((-garmin_start, -garmin_end))
+        self.d.arc(box, start=a, end=b, fill=color, width=max(1, int(width * self.s)))
 
-    def text(self, x, y, size, string, color, align="left", valign="middle"):
-        f = font(size)
+    def text(self, x, y, px, string, color, align="left", valign="middle"):
+        f = font(px)
         box = self.d.textbbox((0, 0), string, font=f)
-        w, h = box[2] - box[0], box[3] - box[1]
-        px = x * SCALE
-        py = y * SCALE
+        tw, th = box[2] - box[0], box[3] - box[1]
+        ox = x * self.s
+        oy = y * self.s
         if align == "center":
-            px -= w / 2
+            ox -= tw / 2
         elif align == "right":
-            px -= w
+            ox -= tw
         if valign == "middle":
-            py -= h / 2
-        self.d.text((px - box[0], py - box[1]), string, font=f, fill=color)
+            oy -= th / 2
+        self.d.text((ox - box[0], oy - box[1]), string, font=f, fill=color)
 
+    def text_width(self, string, px):
+        box = self.d.textbbox((0, 0), string, font=font(px))
+        return (box[2] - box[0]) / self.s
 
-def separator(c, fraction):
-    y = round(fraction * H)
-    half = chord(y)
-    if half < 4:
-        return
-    c.line(CX - half, y, CX + half, y, SEPARATOR, 1)
+    def fit(self, candidates, sample, max_w, max_h):
+        for px in candidates:
+            box = self.d.textbbox((0, 0), sample, font=font(px))
+            if (box[2] - box[0]) / self.s <= max_w and (box[3] - box[1]) / self.s <= max_h:
+                return px
+        return candidates[-1]
 
+    # -- geometry (source/DashboardView.mc) ------------------------------
+    def chord(self, y):
+        r = self.radius * SEPARATOR_RADIUS
+        dy = y - self.cy
+        sq = r * r - dy * dy
+        return 0.0 if sq <= 0 else math.sqrt(sq)
 
-def sun(c, x, y, r, color):
-    c.circle(x, y, r * 0.4, color)
-    for i in range(8):
-        a = i * math.pi / 4
-        dx, dy = math.cos(a), math.sin(a)
-        c.line(x + dx * r * 0.64, y - dy * r * 0.64, x + dx * r, y - dy * r, color, max(1, round(r * 0.2)))
+    def separator(self, fraction):
+        y = round(fraction * self.h)
+        half = self.chord(y)
+        if half < 4:
+            return
+        self.line(self.cx - half, y, self.cx + half, y, SEPARATOR, 1)
 
+    # -- rows -----------------------------------------------------------
+    def draw_date(self):
+        self.text(self.cx, DATE_Y * self.h, self.small_font, SAMPLE["date"], DATE, align="center")
 
-def do_not_disturb(c, x, y, r, color):
-    c.circle(x, y - r * 0.14, r * 0.44, color)
-    c.polygon(
-        [
-            (x - r * 0.68, y + r * 0.42),
-            (x - r * 0.44, y + r * 0.14),
-            (x - r * 0.44, y - r * 0.14),
-            (x + r * 0.44, y - r * 0.14),
-            (x + r * 0.44, y + r * 0.14),
-            (x + r * 0.68, y + r * 0.42),
-        ],
-        color,
-    )
-    c.circle(x, y - r * 0.68, r * 0.13, color)
-    c.circle(x, y + r * 0.62, r * 0.17, color)
-    c.line(x - r * 0.9, y + r * 0.9, x + r * 0.9, y - r * 0.9, BACKGROUND, max(1, round(r * 0.3)))
-    c.line(x - r * 0.86, y + r * 0.86, x + r * 0.86, y - r * 0.86, color, max(1, round(r * 0.16)))
+    def draw_weather(self):
+        y = WEATHER_Y * self.h
+        icon_r = self.w * 0.042
+        gap = self.w * 0.026
+        current, precip = SAMPLE["temp"], SAMPLE["precip"]
+        high, low = SAMPLE["high"], SAMPLE["low"]
 
+        total = icon_r * 2
+        for piece in (current, precip, high, low):
+            if piece is not None:
+                total += self.text_width(piece, self.small_font) + gap
 
-def alarm(c, x, y, r, color):
-    stroke = max(1, round(r * 0.18))
-    c.ring(x, y + r * 0.1, r * 0.66, color, stroke)
-    c.line(x - r * 0.72, y - r * 0.44, x - r * 0.4, y - r * 0.72, color, stroke)
-    c.line(x + r * 0.72, y - r * 0.44, x + r * 0.4, y - r * 0.72, color, stroke)
-    c.line(x, y + r * 0.1, x, y - r * 0.3, color, stroke)
-    c.line(x, y + r * 0.1, x + r * 0.34, y + r * 0.24, color, stroke)
+        x = self.cx - total / 2.0
+        x = self._segment(x, y, current, TEXT, gap)
+        x = self._segment(x, y, precip, TEXT, gap)
+        Icons.weather(self, SAMPLE["condition"], x + icon_r, y, icon_r, TEXT)
+        x += icon_r * 2 + gap
+        x = self._segment(x, y, high, TEXT, gap)
+        self._segment(x, y, low, TEXT_DIM, gap)
 
+    def _segment(self, x, y, string, color, gap):
+        if string is None:
+            return x
+        self.text(x, y, self.small_font, string, color, align="left")
+        return x + self.text_width(string, self.small_font) + gap
 
-def notification(c, x, y, r, color, filled):
-    tail = [(x - r * 0.2, y + r * 0.44), (x + r * 0.2, y + r * 0.44), (x - r * 0.06, y + r * 1.0)]
-    if filled:
-        c.rounded(x - r * 0.86, y - r * 0.72, r * 1.72, r * 1.24, r * 0.3, color)
-        c.polygon(tail, color)
-    else:
-        c.rounded(x - r * 0.86, y - r * 0.72, r * 1.72, r * 1.24, r * 0.3, color, filled=False, width=max(1, round(r * 0.16)))
-        c.line(tail[0][0], tail[0][1], tail[2][0], tail[2][1], color, max(1, round(r * 0.16)))
-        c.line(tail[1][0], tail[1][1], tail[2][0], tail[2][1], color, max(1, round(r * 0.16)))
+    def draw_graph(self):
+        top = GRAPH_TOP_Y * self.h
+        bottom = GRAPH_BOTTOM_Y * self.h
+        half = self.chord(bottom)
+        buckets = Graph.bucket_count(self.w, half)
 
+        values = list(SAMPLE["graph"])
+        values = (values * (buckets // len(values) + 1))[:buckets]
+        Graph.draw(self, self.w, self.cx, top, bottom, values,
+                   SAMPLE["graph_is_percentage"], GRAPH)
 
-def draw_graph(c, values, is_percentage, color):
-    top, bottom = GRAPH_TOP_Y * H, GRAPH_BOTTOM_Y * H
-    bar = max(2, round(W * 0.0154))
-    step = bar + max(2, round(W * 0.0192))
-    count = len(values)
-    total = count * step - (step - bar)
-    x = CX - total / 2
-    height = bottom - top
-    if is_percentage:
-        low, high = 0.0, 100.0
-    else:
-        present = [v for v in values if v is not None]
-        low, high = min(present), max(present)
-        if high - low < 0.001:
-            low, high = low - 0.5, high + 0.5
-    for i, value in enumerate(values):
-        left = x + i * step
-        if value is None:
-            c.rect(left, bottom - 1, bar, 1, color)
-            continue
-        norm = min(1.0, max(0.0, (value - low) / (high - low)))
-        bar_h = height * (0.12 + 0.88 * norm)
-        c.rect(left, bottom - bar_h, bar, bar_h, color)
+    def draw_time(self, offset_y=0.0):
+        hours, minutes = SAMPLE["hours"], SAMPLE["minutes"]
+        gap = self.w * 0.012
+        hw = self.text_width(hours, self.time_font)
+        mw = self.text_width(minutes, self.time_font)
+        x = self.cx - (hw + gap + mw) / 2.0
+        y = TIME_Y * self.h + offset_y
+        self.text(x, y, self.time_font, hours, HOURS, align="left")
+        self.text(x + hw + gap, y, self.time_font, minutes, MINUTES, align="left")
 
+    def draw_status_row(self):
+        y = STATUS_Y * self.h
+        icon_r = self.w * 0.043
+        bb = SAMPLE["body_battery"]
+        self.text(self.w * 0.2, y, self.row_font,
+                  "--" if bb is None else str(bb),
+                  TEXT_DIM if bb is None else TEXT, align="center")
+        Icons.do_not_disturb(self, self.w * 0.395, y, icon_r, DND_ON if SAMPLE["dnd"] else OFF)
+        Icons.alarm(self, self.w * 0.545, y, icon_r, ALARM_ON if SAMPLE["alarm"] else OFF)
+        self.text(self.w * 0.8, y, self.row_font, SAMPLE["steps"], TEXT, align="center")
 
-def draw_arcs(c, body_battery, device_battery, daylight):
-    pen = max(3, round(W * 0.023))
-    radius = R - pen / 2 - 1
-    if body_battery is not None:
-        length = (ARC_LEFT_TO - ARC_LEFT_FROM) * body_battery
-        c.arc(CX, CY, radius, ARC_BODY_BATTERY, ARC_LEFT_FROM, ARC_LEFT_FROM + length, pen)
-    spread = ARC_CENTER_SPREAD * device_battery
-    if spread >= 0.75:
-        c.arc(CX, CY, radius, ARC_DEVICE_BATTERY, ARC_CENTER - spread, ARC_CENTER + spread, pen)
-    if daylight is not None:
-        length = (ARC_RIGHT_TO - ARC_RIGHT_FROM) * daylight
-        c.arc(CX, CY, radius, ARC_DAYLIGHT, ARC_RIGHT_FROM, ARC_RIGHT_FROM + length, pen)
+    def draw_battery_row(self):
+        y = BATTERY_Y * self.h
+        if SAMPLE["battery_days"] is not None:
+            self.text(self.w * 0.375, y, self.small_font, SAMPLE["battery_days"], TEXT, align="center")
+        self.text(self.w * 0.625, y, self.small_font, SAMPLE["battery_pct"], TEXT, align="center")
 
+        count = SAMPLE["notifications"]
+        radius = self.w * 0.045
+        Icons.notification(self, self.cx, y, radius,
+                           NOTIFICATION_ON if count > 0 else OFF, count > 0)
+        if count > 0:
+            self.text(self.cx, y - radius * 0.1, self.badge_font, str(count), TEXT, align="center")
 
-def render(path):
-    c = Canvas()
-    d = c.d
+    def draw_arcs(self):
+        pen = max(3, round(self.w * 0.023))
+        radius = self.radius - pen / 2 - 1
+        Arcs.draw(self, self.cx, self.cy, radius, pen,
+                  SAMPLE["arc_body_battery"], SAMPLE["arc_device_battery"], SAMPLE["arc_daylight"])
 
-    time_band = (SEP_4_Y - SEP_3_Y) * H
-    time_font = fit(d, TIME_FONTS, "88 88", chord(TIME_Y * H) * 2, time_band)
-    row_font = fit(d, ROW_FONTS, "88.8k", W * 0.3, H * 0.095)
-    small_font = fit(d, ROW_FONTS, "888% 888°", W * 0.44, H * 0.078)
-    badge_font = fit(d, ROW_FONTS, "88", W * 0.06, H * 0.055)
+    def draw_sleep_face(self):
+        # source/DashboardView.mc drawSleepFace(): date + time only, dimmed,
+        # nudged over a 5-minute cycle.  Preview picks one offset in that cycle.
+        offset_y = -1 * (self.h / 12.0)
+        self.text(self.cx, SEP_3_Y * self.h + offset_y, self.small_font,
+                  SAMPLE["date"], TEXT_DIM, align="center")
+        # time drawn dim
+        hours, minutes = SAMPLE["hours"], SAMPLE["minutes"]
+        gap = self.w * 0.012
+        hw = self.text_width(hours, self.time_font)
+        mw = self.text_width(minutes, self.time_font)
+        x = self.cx - (hw + gap + mw) / 2.0
+        y = TIME_Y * self.h + offset_y
+        self.text(x, y, self.time_font, hours, TEXT_DIM, align="left")
+        self.text(x + hw + gap, y, self.time_font, minutes, TEXT_DIM, align="left")
 
-    for fraction in (SEP_1_Y, SEP_2_Y, SEP_3_Y, SEP_4_Y, SEP_5_Y):
-        separator(c, fraction)
-
-    # Date
-    c.text(CX, DATE_Y * H, small_font, "Thu 3 Sep", DATE, align="center")
-
-    # Weather
-    y = WEATHER_Y * H
-    icon_r = W * 0.042
-    gap = W * 0.026
-    pieces = [("27°", TEXT), ("40%", TEXT), None, ("21°", TEXT), ("4°", TEXT_DIM)]
-    total = icon_r * 2
-    for piece in pieces:
-        if piece is not None:
-            total += text_size(d, piece[0], small_font)[0] / SCALE + gap
-    x = CX - total / 2
-    for piece in pieces:
-        if piece is None:
-            sun(c, x + icon_r, y, icon_r, TEXT)
-            x += icon_r * 2 + gap
+    # -- compose ------------------------------------------------------
+    def render(self, sleep=False, quantize=True, scale=1):
+        if sleep:
+            self.draw_sleep_face()
         else:
-            c.text(x, y, small_font, piece[0], piece[1])
-            x += text_size(d, piece[0], small_font)[0] / SCALE + gap
+            for f in (SEP_1_Y, SEP_2_Y, SEP_3_Y, SEP_4_Y, SEP_5_Y):
+                self.separator(f)
+            self.draw_date()
+            self.draw_weather()
+            self.draw_graph()
+            self.draw_time()
+            self.draw_status_row()
+            self.draw_battery_row()
+            self.draw_arcs()
 
-    # Graph: a plausible heart rate trace with one gap.
-    series = [58, 61, 55, None, 62, 66, 72, 95, 90, 88, 92, 87, 91, 86, 89, 84, 88, 83, 86, 78, 74, 70, 66, 63, 60]
-    half = chord(GRAPH_BOTTOM_Y * H)
-    count = max(6, int(half * 2 / (max(2, round(W * 0.0154)) + max(2, round(W * 0.0192)))))
-    series = (series * ((count // len(series)) + 1))[:count]
-    draw_graph(c, series, False, GRAPH)
+        # Down to native resolution: the box filter stands in for the panel's
+        # own anti-aliasing.
+        out = self.img.resize((self.w, self.h), Image.BOX)
 
-    # Time
-    hours, minutes = "11", "29"
-    gap = W * 0.012
-    hw = text_size(d, hours, time_font)[0] / SCALE
-    mw = text_size(d, minutes, time_font)[0] / SCALE
-    x = CX - (hw + gap + mw) / 2
-    c.text(x, TIME_Y * H, time_font, hours, HOURS)
-    c.text(x + hw + gap, TIME_Y * H, time_font, minutes, MINUTES)
+        if quantize and self.panel == "mip":
+            out = mip_snap(out)
 
-    # Status row
-    y = STATUS_Y * H
-    icon_r = W * 0.043
-    c.text(W * 0.2, y, row_font, "35", TEXT, align="center")
-    do_not_disturb(c, W * 0.395, y, icon_r, DND_ON)
-    alarm(c, W * 0.545, y, icon_r, ALARM_ON)
-    c.text(W * 0.8, y, row_font, "6.8k", TEXT, align="center")
+        # Round bezel mask.
+        mask = Image.new("L", (self.w, self.h), 0)
+        ImageDraw.Draw(mask).ellipse([0, 0, self.w - 1, self.h - 1], fill=255)
+        framed = Image.new("RGB", (self.w, self.h), (18, 18, 18))
+        framed.paste(out, (0, 0), mask)
 
-    # Battery row
-    y = BATTERY_Y * H
-    c.text(W * 0.375, y, small_font, "0d", TEXT, align="center")
-    c.text(W * 0.625, y, small_font, "9%", TEXT, align="center")
-    radius = W * 0.045
-    notification(c, CX, y, radius, NOTIFICATION_ON, True)
-    c.text(CX, y - radius * 0.1, badge_font, "1", TEXT, align="center")
+        if scale != 1:
+            framed = framed.resize((self.w * scale, self.h * scale), Image.NEAREST)
+        return framed
 
-    draw_arcs(c, 0.35, 0.09, 0.2)
 
-    # Mask everything outside the round screen.
-    mask = Image.new("L", c.image.size, 0)
-    ImageDraw.Draw(mask).ellipse([0, 0, W * SCALE - 1, H * SCALE - 1], fill=255)
-    out = Image.new("RGB", c.image.size, (20, 20, 20))
-    out.paste(c.image, (0, 0), mask)
-    out.resize((W, H), Image.LANCZOS).save(path)
-    print("wrote", path)
+# --- MIP 64-colour panel ------------------------------------------------
+def mip_snap(img):
+    """Snap every channel to 0x00 / 0x55 / 0xAA / 0xFF, the palette a fenix
+    transflective display renders without dithering."""
+    levels = [0x00, 0x55, 0xAA, 0xFF]
+    lut = bytes(levels[min(3, int(round(v / 85.0)))] for v in range(256))
+    return img.point(lut * 3)
+
+
+# --- source/Graph.mc --------------------------------------------------
+class Graph:
+    MIN_BAR = 0.12
+
+    @staticmethod
+    def bar_width(w):
+        return max(2, round(w * 0.0154))
+
+    @staticmethod
+    def pitch(w):
+        return Graph.bar_width(w) + max(2, round(w * 0.0192))
+
+    @staticmethod
+    def bucket_count(w, half):
+        return max(6, int((half * 2) / Graph.pitch(w)))
+
+    @staticmethod
+    def draw(face, w, cx, top, bottom, values, is_percentage, color):
+        count = len(values)
+        if count == 0:
+            return
+        bar = Graph.bar_width(w)
+        step = Graph.pitch(w)
+        total = count * step - (step - bar)
+        x = cx - total / 2.0
+        height = bottom - top
+
+        if is_percentage:
+            low, high = 0.0, 100.0
+        else:
+            present = [v for v in values if v is not None]
+            if not present:
+                return
+            low, high = float(min(present)), float(max(present))
+            if high - low < 0.001:
+                low, high = low - 0.5, high + 0.5
+
+        for i, value in enumerate(values):
+            left = x + i * step
+            if value is None:
+                face.rect(left, bottom - 1, bar, 1, color)
+                continue
+            norm = min(1.0, max(0.0, (value - low) / (high - low)))
+            bar_h = height * (Graph.MIN_BAR + (1.0 - Graph.MIN_BAR) * norm)
+            face.rect(left, bottom - bar_h, bar, bar_h, color)
+
+
+# --- source/Arcs.mc -------------------------------------------------
+class Arcs:
+    MIN_SWEEP = 0.75
+
+    @staticmethod
+    def clamp(f):
+        return 0.0 if f < 0.0 else (1.0 if f > 1.0 else f)
+
+    @staticmethod
+    def draw(face, cx, cy, radius, pen, body_battery, device_battery, daylight):
+        if body_battery is not None:
+            Arcs._sweep(face, cx, cy, radius, ARC_BODY_BATTERY,
+                        ARC_LEFT_FROM, ARC_LEFT_TO, body_battery, pen)
+
+        spread = ARC_CENTER_SPREAD * Arcs.clamp(device_battery)
+        if spread >= Arcs.MIN_SWEEP:
+            face.arc(cx, cy, radius, ARC_DEVICE_BATTERY, ARC_CENTER, ARC_CENTER - spread, pen)
+            face.arc(cx, cy, radius, ARC_DEVICE_BATTERY, ARC_CENTER, ARC_CENTER + spread, pen)
+
+        if daylight is not None:
+            Arcs._sweep(face, cx, cy, radius, ARC_DAYLIGHT,
+                        ARC_RIGHT_FROM, ARC_RIGHT_TO, daylight, pen)
+
+    @staticmethod
+    def _sweep(face, cx, cy, radius, color, frm, to, fraction, pen):
+        length = (to - frm) * Arcs.clamp(fraction)
+        if -Arcs.MIN_SWEEP < length < Arcs.MIN_SWEEP:
+            return
+        face.arc(cx, cy, radius, color, frm, frm + length, pen)
+
+
+# --- source/Icons.mc ----------------------------------------------
+class Icons:
+    SUN, PARTLY_CLOUDY, CLOUDY, RAIN, SNOW, STORM, FOG, WIND = range(8)
+
+    @staticmethod
+    def weather(face, group, x, y, r, color):
+        if group == Icons.SUN:
+            Icons._sun(face, x, y, r, color)
+        elif group == Icons.PARTLY_CLOUDY:
+            Icons._sun(face, x + r * 0.34, y - r * 0.36, r * 0.55, color)
+            Icons._cloud(face, x - r * 0.14, y + r * 0.22, r * 0.82, color)
+        elif group == Icons.CLOUDY:
+            Icons._cloud(face, x, y + r * 0.1, r, color)
+        elif group == Icons.RAIN:
+            Icons._cloud(face, x, y - r * 0.16, r * 0.9, color)
+            Icons._drops(face, x, y + r * 0.62, r, color)
+        elif group == Icons.SNOW:
+            Icons._cloud(face, x, y - r * 0.16, r * 0.9, color)
+            Icons._flakes(face, x, y + r * 0.66, r, color)
+        elif group == Icons.STORM:
+            Icons._cloud(face, x, y - r * 0.2, r * 0.9, color)
+            Icons._bolt(face, x, y + r * 0.6, r, color)
+        elif group == Icons.FOG:
+            Icons._cloud(face, x, y - r * 0.24, r * 0.82, color)
+            Icons._bars(face, x, y + r * 0.58, r, color)
+        elif group == Icons.WIND:
+            Icons._bars(face, x, y, r * 1.25, color)
+
+    @staticmethod
+    def _sun(face, x, y, r, color):
+        face.circle(x, y, r * 0.4, color)
+        for i in range(8):
+            a = i * math.pi / 4.0
+            dx, dy = math.cos(a), math.sin(a)
+            face.line(x + dx * r * 0.64, y - dy * r * 0.64, x + dx * r, y - dy * r,
+                      color, max(1, round(r * 0.2)))
+
+    @staticmethod
+    def _cloud(face, x, y, r, color):
+        face.circle(x - r * 0.46, y + r * 0.14, r * 0.4, color)
+        face.circle(x + r * 0.44, y + r * 0.2, r * 0.36, color)
+        face.circle(x - r * 0.02, y - r * 0.14, r * 0.52, color)
+        face.rect(x - r * 0.86, y + r * 0.14, r * 1.72, r * 0.42, color)
+
+    @staticmethod
+    def _drops(face, x, y, r, color):
+        for i in (-1, 0, 1):
+            dx = x + i * r * 0.46
+            face.line(dx + r * 0.1, y - r * 0.2, dx - r * 0.1, y + r * 0.24,
+                      color, max(1, round(r * 0.16)))
+
+    @staticmethod
+    def _flakes(face, x, y, r, color):
+        for i in (-1, 0, 1):
+            face.circle(x + i * r * 0.46, y, r * 0.14, color)
+
+    @staticmethod
+    def _bolt(face, x, y, r, color):
+        face.polygon([
+            (x + r * 0.24, y - r * 0.42), (x - r * 0.28, y + r * 0.06),
+            (x - r * 0.02, y + r * 0.06), (x - r * 0.2, y + r * 0.5),
+            (x + r * 0.3, y - r * 0.04), (x + r * 0.02, y - r * 0.04),
+        ], color)
+
+    @staticmethod
+    def _bars(face, x, y, r, color):
+        w = max(1, round(r * 0.16))
+        face.line(x - r * 0.7, y - r * 0.3, x + r * 0.7, y - r * 0.3, color, w)
+        face.line(x - r * 0.5, y, x + r * 0.8, y, color, w)
+        face.line(x - r * 0.7, y + r * 0.3, x + r * 0.6, y + r * 0.3, color, w)
+
+    @staticmethod
+    def do_not_disturb(face, x, y, r, color):
+        face.circle(x, y - r * 0.14, r * 0.44, color)
+        face.polygon([
+            (x - r * 0.68, y + r * 0.42), (x - r * 0.44, y + r * 0.14),
+            (x - r * 0.44, y - r * 0.14), (x + r * 0.44, y - r * 0.14),
+            (x + r * 0.44, y + r * 0.14), (x + r * 0.68, y + r * 0.42),
+        ], color)
+        face.circle(x, y - r * 0.68, r * 0.13, color)
+        face.circle(x, y + r * 0.62, r * 0.17, color)
+        face.line(x - r * 0.9, y + r * 0.9, x + r * 0.9, y - r * 0.9,
+                  BACKGROUND, max(1, round(r * 0.3)))
+        face.line(x - r * 0.86, y + r * 0.86, x + r * 0.86, y - r * 0.86,
+                  color, max(1, round(r * 0.16)))
+
+    @staticmethod
+    def alarm(face, x, y, r, color):
+        stroke = max(1, round(r * 0.18))
+        face.ring(x, y + r * 0.1, r * 0.66, color, stroke)
+        face.line(x - r * 0.72, y - r * 0.44, x - r * 0.4, y - r * 0.72, color, stroke)
+        face.line(x + r * 0.72, y - r * 0.44, x + r * 0.4, y - r * 0.72, color, stroke)
+        face.line(x, y + r * 0.1, x, y - r * 0.3, color, stroke)
+        face.line(x, y + r * 0.1, x + r * 0.34, y + r * 0.24, color, stroke)
+
+    @staticmethod
+    def notification(face, x, y, r, color, filled):
+        tail = [(x - r * 0.2, y + r * 0.44), (x + r * 0.2, y + r * 0.44),
+                (x - r * 0.06, y + r * 1.0)]
+        if filled:
+            face.rounded(x - r * 0.86, y - r * 0.72, r * 1.72, r * 1.24, r * 0.3, color)
+            face.polygon(tail, color)
+        else:
+            w = max(1, round(r * 0.16))
+            face.rounded(x - r * 0.86, y - r * 0.72, r * 1.72, r * 1.24, r * 0.3,
+                         color, filled=False, width=w)
+            face.line(tail[0][0], tail[0][1], tail[2][0], tail[2][1], color, w)
+            face.line(tail[1][0], tail[1][1], tail[2][0], tail[2][1], color, w)
+
+
+# --- cli ------------------------------------------------------------
+def main(argv):
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("out", nargs="?", default="preview.png", help="output PNG path")
+    ap.add_argument("--device", "-d", default=DEFAULT_DEVICE, choices=sorted(DEVICES),
+                    help="target device (default: %(default)s)")
+    ap.add_argument("--scale", "-s", type=int, default=1,
+                    help="nearest-neighbour zoom for the saved PNG (default: 1)")
+    ap.add_argument("--sleep", action="store_true", help="render the sleep / burn-in variant")
+    ap.add_argument("--no-quantize", dest="quantize", action="store_false",
+                    help="skip the MIP 64-colour snap on transflective devices")
+    ap.add_argument("--all", action="store_true",
+                    help="render every device to tools/preview-<device>.png and exit")
+    args = ap.parse_args(argv)
+
+    if args.all:
+        for device in sorted(DEVICES):
+            path = os.path.join(HERE, "preview-%s.png" % device)
+            Face(device).render(sleep=args.sleep, quantize=args.quantize,
+                                scale=args.scale).save(path)
+            print("wrote", path)
+        return
+
+    Face(args.device).render(sleep=args.sleep, quantize=args.quantize,
+                             scale=args.scale).save(args.out)
+    print("wrote %s (%s, %dx%d%s)" % (
+        args.out, args.device, DEVICES[args.device][0], DEVICES[args.device][1],
+        ", MIP palette" if args.quantize and DEVICES[args.device][2] == "mip" else ""))
 
 
 if __name__ == "__main__":
-    render(sys.argv[1] if len(sys.argv) > 1 else "preview.png")
+    main(sys.argv[1:])
