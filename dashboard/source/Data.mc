@@ -51,6 +51,33 @@ module Data {
     return hours < 1 ? 1 : (hours > 24 ? 24 : hours);
   }
 
+  //! The colours offered for the clock digits, on the watch and in Garmin
+  //! Connect. All are straight from the MIP palette. The order here is the
+  //! order the on-watch menu shows and must match resources/settings/settings.xml
+  //! and SettingsMenu.colorLabels().
+  function clockColorChoices() as Array<Number> {
+    return [0xFFFFFF, 0xAAAAAA, 0x00FFFF, 0x00FF00, 0xFFFF00, 0xFFAA00, 0xFF0000, 0x00AAFF];
+  }
+
+  function hourColor() as Number {
+    return clockColor("hourColor", Theme.HOURS);
+  }
+
+  function minuteColor() as Number {
+    return clockColor("minuteColor", Theme.MINUTES);
+  }
+
+  function clockColor(key as String, fallback as Number) as Number {
+    var value = property(key, fallback);
+    var choices = clockColorChoices();
+    for (var i = 0; i < choices.size(); i++) {
+      if (choices[i] == value) {
+        return value;
+      }
+    }
+    return fallback;
+  }
+
   //! Averages the selected series into `buckets` equal time slots, oldest
   //! first. Slots without a sample are null so the graph can leave a gap.
   //! Returns null when the series is unavailable or completely empty.

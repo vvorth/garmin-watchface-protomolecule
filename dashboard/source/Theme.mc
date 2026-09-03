@@ -11,10 +11,14 @@ module Theme {
   const BACKGROUND as Number = 0x000000;
 
   const DATE as Number = 0x00FF00;
+
+  //! Default clock colours. Both are overridable from the watch (hourColor /
+  //! minuteColor properties, one of Data.clockColorChoices()).
   const HOURS as Number = 0xFFFFFF;
   const MINUTES as Number = 0x00FFFF;
 
   const TEXT as Number = 0xFFFFFF;
+  //! Every secondary read-out (weather, Body Battery, steps, device battery).
   const TEXT_DIM as Number = 0xAAAAAA;
   const SEPARATOR as Number = 0x555555;
 
@@ -32,6 +36,14 @@ module Theme {
   //! Unfilled part of every bottom arc: shows how long the track is when full,
   //! so a partial fill can be read against it. Darkest grey the MIP panel has.
   const ARC_TRACK as Number = 0x555555;
+
+  //! Arc thicknesses, in pixels. The coloured fill is a pixel thicker than the
+  //! grey track and shares its outer edge, so a filled arc reads as slightly
+  //! raised / glowing next to an empty one. ARC_EDGE_INSET keeps the outer edge
+  //! a hair off the bezel so the full stroke is visible.
+  const ARC_TRACK_PEN as Number = 2;
+  const ARC_FILL_PEN as Number = 3;
+  const ARC_EDGE_INSET as Number = 1;
 }
 
 //! Vertical layout of the face, as fractions of the screen height.
@@ -43,11 +55,11 @@ module Layout {
   const SEP_1_Y as Float = 0.112;
   const WEATHER_Y as Float = 0.163;
   const SEP_2_Y as Float = 0.216;
-  const GRAPH_TOP_Y as Float = 0.232;
-  const GRAPH_BOTTOM_Y as Float = 0.324;
-  const SEP_3_Y as Float = 0.342;
-  const TIME_Y as Float = 0.506;
-  const SEP_4_Y as Float = 0.670;
+  const GRAPH_TOP_Y as Float = 0.230;
+  const GRAPH_BOTTOM_Y as Float = 0.318;
+  const SEP_3_Y as Float = 0.334;
+  const TIME_Y as Float = 0.507;
+  const SEP_4_Y as Float = 0.678;
   const STATUS_Y as Float = 0.754;
   const SEP_5_Y as Float = 0.828;
   const BATTERY_Y as Float = 0.884;

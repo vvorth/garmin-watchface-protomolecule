@@ -23,25 +23,26 @@ two projects are independent and neither one's build touches the other.
 | 1 | Day of week, day of month, month — green |
 | 2 | Current temperature · chance of precipitation · today's condition · today's high · today's low |
 | 3 | Configurable history graph (heart rate, Body Battery, stress, pressure, elevation or Pulse Ox) |
-| 4 | Time — hours white, minutes cyan |
-| 5 | Body Battery · do-not-disturb (red on / grey off) · alarm (yellow on / grey off) · steps (`6.8k` past 1000) |
+| 4 | Time — Chivo bitmap digits, hours and minutes each a configurable colour (default white / cyan), the gap between them on the screen centre line |
+| 5 | Body Battery · do-not-disturb (red on / grey off) · alarm (yellow on / grey off) · steps (`6.8k` past 1000) — text light grey |
 | 6 | Battery days remaining · notification badge (orange with a count, grey and empty at zero) · battery percentage |
-| Arcs | left: Body Battery, filling upwards · centre: device battery, filling out of 6 o'clock both ways · right: daylight left, full at sunrise and empty at sunset |
+| Arcs | left: Body Battery, filling upwards · centre: device battery, filling out of 6 o'clock both ways · right: daylight left, full at sunrise and empty at sunset. Each is a grey full-length track with a slightly thicker coloured fill on top. |
 
 Anything the watch cannot supply is simply left out: no weather sync means the
-weather row shows `--`, a device with no Body Battery sensor gets no left arc,
-and so on. Nothing throws.
+weather row shows `--`, a device with no Body Battery sensor gets no left-arc
+fill (the grey track still shows). Nothing throws.
 
 ### Settings
 
-Two settings, changeable **on the watch** (hold the menu button on the face →
+Four settings, changeable **on the watch** (hold the menu button on the face →
 the face's settings) or from Garmin Connect:
 
-- **Graph** — which series the graph plots.
-- **Graph range** — how far back it reaches, 2 to 24 hours (default 4).
+- **Graph** — which series the graph plots (`graphSource`).
+- **Graph range** — how far back it reaches, 2 to 24 hours, default 4 (`graphHours`).
+- **Hour colour** / **Minute colour** — the clock digit colours, one of eight
+  MIP-palette choices (`hourColor`, `minuteColor`, stored as packed `0xRRGGBB`).
 
-Both are stored as app properties (`graphSource`, `graphHours`); the on-watch
-menu and the Connect settings drive the same two values.
+The on-watch menu and the Connect settings drive the same properties.
 
 ---
 

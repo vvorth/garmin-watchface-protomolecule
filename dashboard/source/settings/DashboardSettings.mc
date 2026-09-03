@@ -2,11 +2,13 @@ import Toybox.Application.Properties;
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-//! On-watch settings. Two choices for now: what the graph plots, and how far
-//! back it reaches.
+//! On-watch settings: what the graph plots, how far back it reaches, and the
+//! two clock colours.
 module SettingsMenu {
   const GRAPH_SOURCE_ITEM as String = "graphSource";
   const GRAPH_HOURS_ITEM as String = "graphHours";
+  const HOUR_COLOR_ITEM as String = "hourColor";
+  const MINUTE_COLOR_ITEM as String = "minuteColor";
 
   const HOUR_CHOICES as Array<Number> = [2, 4, 6, 8, 12, 24];
 
@@ -22,8 +24,32 @@ module SettingsMenu {
     ];
   }
 
+  //! Indexed to match Data.clockColorChoices().
+  function colorLabels() as Array {
+    return [
+      Rez.Strings.ColorWhite,
+      Rez.Strings.ColorGray,
+      Rez.Strings.ColorCyan,
+      Rez.Strings.ColorGreen,
+      Rez.Strings.ColorYellow,
+      Rez.Strings.ColorOrange,
+      Rez.Strings.ColorRed,
+      Rez.Strings.ColorBlue,
+    ];
+  }
+
   function sourceLabel() as String {
     return WatchUi.loadResource(sourceLabels()[Data.graphSource()]);
+  }
+
+  function colorLabel(value as Number) as String {
+    var choices = Data.clockColorChoices();
+    for (var i = 0; i < choices.size(); i++) {
+      if (choices[i] == value) {
+        return WatchUi.loadResource(colorLabels()[i]);
+      }
+    }
+    return WatchUi.loadResource(colorLabels()[0]);
   }
 
   function hoursLabel(hours as Number) as String {
@@ -44,6 +70,8 @@ class DashboardSettingsMenu extends WatchUi.Menu2 {
     Menu2.initialize({ :title => WatchUi.loadResource(Rez.Strings.SettingsTitle) });
     addItem(new WatchUi.MenuItem(WatchUi.loadResource(Rez.Strings.GraphSource), SettingsMenu.sourceLabel(), SettingsMenu.GRAPH_SOURCE_ITEM, null));
     addItem(new WatchUi.MenuItem(WatchUi.loadResource(Rez.Strings.GraphHours), SettingsMenu.hoursLabel(Data.graphHours()), SettingsMenu.GRAPH_HOURS_ITEM, null));
+    addItem(new WatchUi.MenuItem(WatchUi.loadResource(Rez.Strings.HourColor), SettingsMenu.colorLabel(Data.hourColor()), SettingsMenu.HOUR_COLOR_ITEM, null));
+    addItem(new WatchUi.MenuItem(WatchUi.loadResource(Rez.Strings.MinuteColor), SettingsMenu.colorLabel(Data.minuteColor()), SettingsMenu.MINUTE_COLOR_ITEM, null));
   }
 }
 
@@ -69,7 +97,21 @@ class DashboardSettingsDelegate extends WatchUi.Menu2InputDelegate {
         labels[i] = SettingsMenu.hoursLabel(values[i]);
       }
       push(Rez.Strings.GraphHours, labels, values, Data.graphHours(), SettingsMenu.GRAPH_HOURS_ITEM, item);
+    } else if (SettingsMenu.HOUR_COLOR_ITEM.equals(id)) {
+      pushColors(Rez.Strings.HourColor, Data.hourColor(), SettingsMenu.HOUR_COLOR_ITEM, item);
+    } else if (SettingsMenu.MINUTE_COLOR_ITEM.equals(id)) {
+      pushColors(Rez.Strings.MinuteColor, Data.minuteColor(), SettingsMenu.MINUTE_COLOR_ITEM, item);
     }
+  }
+
+  hidden function pushColors(title as ResourceId, selected as Number, key as String, parent as WatchUi.MenuItem) as Void {
+    var values = Data.clockColorChoices();
+    var resIds = SettingsMenu.colorLabels();
+    var labels = new [values.size()];
+    for (var i = 0; i < values.size(); i++) {
+      labels[i] = WatchUi.loadResource(resIds[i]);
+    }
+    push(title, labels, values, selected, key, parent);
   }
 
   function onBack() as Void {

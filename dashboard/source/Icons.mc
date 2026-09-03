@@ -223,15 +223,19 @@ module Icons {
     dc.setPenWidth(1);
   }
 
+  //! Vertical span of notification() as a multiple of r (it reaches from
+  //! y - 0.75r to y + 0.85r); callers size the badge to a slot with this.
+  const NOTIFICATION_SPAN as Float = 1.60;
+
   //! Speech bubble, always a solid fill in `color` (grey when idle, orange with
-  //! a count otherwise). The caller draws the number on top.
+  //! a count otherwise). Roughly square. The caller draws the number on top.
   function notification(dc as Graphics.Dc, x as Numeric, y as Numeric, r as Numeric, color as Number) as Void {
     dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-    dc.fillRoundedRectangle(x - r * 0.9, y - r * 0.78, r * 1.8, r * 1.34, r * 0.34);
+    dc.fillRoundedRectangle(x - r * 0.85, y - r * 0.75, r * 1.7, r * 1.2, r * 0.30);
     dc.fillPolygon([
-      pt(x - r * 0.22, y + r * 0.5),
-      pt(x + r * 0.22, y + r * 0.5),
-      pt(x - r * 0.04, y + r * 1.08),
+      pt(x - r * 0.24, y + r * 0.40),
+      pt(x + r * 0.24, y + r * 0.40),
+      pt(x - r * 0.04, y + r * 0.85),
     ]);
   }
 

@@ -90,8 +90,8 @@ class DashboardView extends WatchUi.WatchFace {
     drawGraph(dc);
     drawTime(dc, 0);
     drawStatusRow(dc, settings, bodyBattery);
-    drawBatteryRow(dc, settings);
     drawArcs(dc, bodyBattery);
+    drawBatteryRow(dc, settings); // after the arcs: the badge overlaps them, not the reverse
   }
 
   function onEnterSleep() as Void {
@@ -167,12 +167,12 @@ class DashboardView extends WatchUi.WatchFace {
 
     // Left of the icon, growing leftwards: precipitation nearest, then current.
     var edge = mCenterX - iconRadius - pad;
-    edge = drawFieldRight(dc, edge, y, precipitation, Theme.TEXT, gap);
-    drawFieldRight(dc, edge, y, current, Theme.TEXT, gap);
+    edge = drawFieldRight(dc, edge, y, precipitation, Theme.TEXT_DIM, gap);
+    drawFieldRight(dc, edge, y, current, Theme.TEXT_DIM, gap);
 
     // Right of the icon, growing rightwards: high nearest, then low.
     edge = mCenterX + iconRadius + pad;
-    edge = drawFieldLeft(dc, edge, y, high, Theme.TEXT, gap);
+    edge = drawFieldLeft(dc, edge, y, high, Theme.TEXT_DIM, gap);
     drawFieldLeft(dc, edge, y, low, Theme.TEXT_DIM, gap);
   }
 
@@ -212,8 +212,11 @@ class DashboardView extends WatchUi.WatchFace {
     Graph.draw(dc, mWidth, mCenterX, top, bottom, values, Data.graphIsPercentage(source), Theme.GRAPH);
   }
 
-  //! Hours and minutes as one centred block, no colon, minutes in the accent
-  //! colour. `offsetY` shifts the block for burn-in protection.
+  //! Hours and minutes, no colon, each in its own configurable colour. The gap
+  //! between them straddles the screen centre line: hours are right-aligned to
+  //! just left of centre, minutes left-aligned just right of it, so the join
+  //! stays put whether the hour is one digit or two. 24-hour mode keeps the
+  //! leading zero, 12-hour mode drops it. `offsetY` shifts it for burn-in.
   hidden function drawTime(dc as Graphics.Dc, offsetY as Numeric) as Void {
     var clock = System.getClockTime();
     var is24Hour = System.getDeviceSettings().is24Hour;
@@ -228,76 +231,71 @@ class DashboardView extends WatchUi.WatchFace {
     var hours = is24Hour ? hour.format("%02d") : hour.format("%d");
     var minutes = clock.min.format("%02d");
 
-    var gap = mWidth * 0.012;
-    var hoursWidth = dc.getTextDimensions(hours, mTimeFont)[0];
-    var minutesWidth = dc.getTextDimensions(minutes, mTimeFont)[0];
-    var x = mCenterX - (hoursWidth + gap + minutesWidth) / 2.0;
+    var halfGap = mWidth * 0.010;
     var y = Layout.TIME_Y * mHeight + offsetY;
 
-    dc.setColor(Theme.HOURS, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(x, y, mTimeFont, hours, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-    dc.setColor(Theme.MINUTES, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(x + hoursWidth + gap, y, mTimeFont, minutes, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.setColor(Data.hourColor(), Graphics.COLOR_TRANSPARENT);
+    dc.drawText(mCenterX - halfGap, y, mTimeFont, hours, Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.setColor(Data.minuteColor(), Graphics.COLOR_TRANSPARENT);
+    dc.drawText(mCenterX + halfGap, y, mTimeFont, minutes, Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
-  //! Do-not-disturb and Body Battery on the left, alarm dead centre, steps on
+  //! Body Battery on the left, do-not-disturb next, alarm dead centre, steps on
   //! the right. Body Battery is almost always two digits and the step count
   //! three to five, so this balances left against right.
   hidden function drawStatusRow(dc as Graphics.Dc, settings as System.DeviceSettings, bodyBattery as Number?) as Void {
     var y = Layout.STATUS_Y * mHeight;
     var iconRadius = mWidth * 0.044;
 
-    var doNotDisturb = settings has :doNotDisturb && settings.doNotDisturb;
-    Icons.doNotDisturb(dc, mWidth * 0.175, y, iconRadius, doNotDisturb ? Theme.DND_ON : Theme.OFF);
+    dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+    dc.drawText(mWidth * 0.175, y, mRowFont, bodyBattery == null ? "--" : bodyBattery.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-    dc.setColor(bodyBattery == null ? Theme.TEXT_DIM : Theme.TEXT, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mWidth * 0.335, y, mRowFont, bodyBattery == null ? "--" : bodyBattery.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    var doNotDisturb = settings has :doNotDisturb && settings.doNotDisturb;
+    Icons.doNotDisturb(dc, mWidth * 0.335, y, iconRadius, doNotDisturb ? Theme.DND_ON : Theme.OFF);
 
     var alarms = settings.alarmCount != null && settings.alarmCount > 0;
     Icons.alarm(dc, mCenterX, y, iconRadius, alarms ? Theme.ALARM_ON : Theme.OFF);
 
-    dc.setColor(Theme.TEXT, Graphics.COLOR_TRANSPARENT);
+    dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
     dc.drawText(mWidth * 0.775, y, mRowFont, Data.formatSteps(Data.steps()), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
   //! Estimated days of battery left, notification badge, battery percentage.
-  //! The badge is a solid rounded square, centred: grey when there is nothing
-  //! waiting, orange with a count when there is. Bigger than the surrounding
-  //! text so it reads at a glance.
+  //! The badge is a solid rounded square: grey when nothing is waiting, orange
+  //! with a count when something is. It is grown to fill the gap between the
+  //! separator above it and the arc below it, 1 px clear of each, so it is the
+  //! biggest thing on the row and easy to hit at a glance.
   hidden function drawBatteryRow(dc as Graphics.Dc, settings as System.DeviceSettings) as Void {
-    var y = Layout.BATTERY_Y * mHeight;
-
-    var days = Data.batteryDays();
-    if (days != null) {
-      dc.setColor(Theme.TEXT, Graphics.COLOR_TRANSPARENT);
-      dc.drawText(mWidth * 0.335, y, mSmallFont, days.format("%d") + "d", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-    }
-
-    dc.setColor(Theme.TEXT, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mWidth * 0.665, y, mSmallFont, Data.batteryPercent().format("%d") + "%", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    var top = Layout.SEP_5_Y * mHeight + 1;
+    var bottom = mCenterY + mRadius - Theme.ARC_EDGE_INSET - Theme.ARC_FILL_PEN - 1; // 1 px inside the fill arc
+    var radius = (bottom - top) / Icons.NOTIFICATION_SPAN;
+    var y = top + radius * 0.75;
 
     var count = settings.notificationCount == null ? 0 : settings.notificationCount;
-    var radius = mWidth * 0.056;
     Icons.notification(dc, mCenterX, y, radius, count > 0 ? Theme.NOTIFICATION_ON : Theme.OFF);
+
+    // The number and the flanking day/percent readouts all sit on the badge
+    // body's centre line, which is above the badge's geometric centre.
+    var textY = y - radius * 0.15;
     if (count > 0) {
       dc.setColor(Theme.TEXT, Graphics.COLOR_TRANSPARENT);
-      dc.drawText(mCenterX, y - radius * 0.12, mBadgeFont, count.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+      dc.drawText(mCenterX, textY, mBadgeFont, count.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
+
+    dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
+    var days = Data.batteryDays();
+    if (days != null) {
+      dc.drawText(mWidth * 0.32, textY, mSmallFont, days.format("%d") + "d", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+    dc.drawText(mWidth * 0.68, textY, mSmallFont, Data.batteryPercent().format("%d") + "%", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
   hidden function drawArcs(dc as Graphics.Dc, bodyBattery as Number?) as Void {
-    var pen = Math.round(mWidth * 0.023).toNumber();
-    if (pen < 3) {
-      pen = 3;
-    }
-    var radius = mRadius - pen / 2 - 1;
-
     Arcs.draw(
       dc,
       mCenterX,
       mCenterY,
-      radius,
-      pen,
+      mRadius,
       bodyBattery == null ? null : bodyBattery / 100.0,
       Data.batteryPercent() / 100.0,
       Data.daylightRemaining()
