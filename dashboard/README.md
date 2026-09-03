@@ -9,7 +9,8 @@ status row, a battery row, and three progress arcs around the bottom edge.
 *(rendered by `tools/preview.py`, not the simulator — see [Previewing](#previewing-without-the-simulator))*
 
 The design this was built to, and the original brief behind each row, are in
-[`docs/brief.md`](docs/brief.md).
+[`docs/brief.md`](docs/brief.md); how the code works, end to end, is in
+[`docs/internals.md`](docs/internals.md).
 
 This lives beside the existing Protomolecule face in the repository root; the
 two projects are independent and neither one's build touches the other.
@@ -150,6 +151,10 @@ fenix8solar47mm` against a debug build.
 
 ## How the code is put together
 
+**The full walkthrough — entry point, framework lifecycle, module map, and
+change recipes — is in [`docs/internals.md`](docs/internals.md).** This section
+is the short version.
+
 Monkey C is Garmin's language for Connect IQ: object-oriented, garbage
 collected, duck-typed with **optional** static types (`as Number`), and
 compiled to bytecode for a small VM on the watch. A few properties of it shape
@@ -193,6 +198,8 @@ resources/
 tools/preview.py                 static preview renderer
 tools/make_clock_font.py         regenerates resources/fonts/ from tools/fonts/
 build.sh                         SDK lookup, key generation, compile
+docs/internals.md                how it all works, end to end
+docs/brief.md                    the original request, one row at a time
 ```
 
 ### Layout

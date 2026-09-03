@@ -25,15 +25,16 @@ registry and lives behind a licence click-through on `developer.garmin.com` — 
 host the session egress policy blocks (CONNECT returns 403). Do not try to route
 around it; say so and hand the user the build command instead.
 
-**The `dashboard/` source has never been through a compiler.** It was written,
-reviewed by reading, and checked visually with the preview renderer below — but
-expect first-build errors and treat any claim that it "works" as unverified.
+**The `dashboard/` face compiles and runs in the simulator** (fenix8solar47mm,
+SDK 9.2.x) as of the first build. Layout changes are then checked with the
+preview renderer below; treat a claim that a *specific later change* "works" on
+device as unverified until the user has re-run it.
 
 Building, when an SDK is available:
 
 ```sh
-cd dashboard && ./build.sh                # → bin/dashboard-fenix8solar47mm.prg
-cd dashboard && ./build.sh fenix847mm     # another device from manifest.xml
+cd dashboard && ./build.sh                   # → bin/dashboard-fenix8solar47mm.prg
+cd dashboard && ./build.sh fenix8solar51mm   # the other device from manifest.xml
 ```
 
 `build.sh` locates the SDK (`PATH`, `$CIQ_SDK`, or the SDK Manager's default
@@ -41,6 +42,11 @@ directory), generates the signing key on first run, and calls `monkeyc`.
 `dashboard/README.md` has the SDK install steps and the raw command.
 
 ## Working on dashboard/
+
+**`dashboard/docs/internals.md` is the full architecture walkthrough** — entry
+point, framework lifecycle, module map, the settings/data-refresh model, and
+change recipes. Read it before a non-trivial change; keep it current when the
+structure shifts.
 
 - **Layout lives in `source/Theme.mc`** as fractions of screen height, measured
   off the reference image. Nothing is hard coded to 260×260.
