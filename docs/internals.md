@@ -138,7 +138,7 @@ between frames.
 
 ```monkeyc
 // source/DashboardView.mc — onUpdate(), condensed
-Data.beginFrame();              // one clock/settings/stats snapshot for the frame
+Data.beginFrame();              // one clock + DeviceSettings snapshot for the frame
 
 dc.setColor(Theme.TEXT, Theme.BACKGROUND);
 dc.clear();
@@ -419,15 +419,16 @@ minutes wide.
 
 | Tier | What | Refresh |
 | --- | --- | --- |
-| **Per frame** | clock; `DeviceSettings` (DND, alarm, notification count); `SystemStats` (battery %); step count | every `onUpdate` — so a gesture shows them live |
-| **`SLOW_TTL`** (5 min) | graph series, Body Battery, weather, battery-days estimate | at most once per TTL |
+| **Per frame** | clock; `DeviceSettings` (DND, alarm, notification count); step count | every `onUpdate` — so a gesture shows them live |
+| **`SLOW_TTL`** (5 min) | graph series, Body Battery, weather, the `SystemStats` snapshot (battery % and days) | at most once per TTL |
 | **Per day / per change** | sunrise & sunset, the date string; app properties | once a day; properties on a settings change |
 
 The per-frame tier is deliberately the set the user notices: raise your wrist
 and the notification badge, DND, alarm and steps are current to the second. The
-`DeviceSettings` and `SystemStats` snapshots are taken **once** in
-`Data.beginFrame()` and shared by every row, rather than each row calling the
-system for itself.
+`DeviceSettings` snapshot is taken **once** in `Data.beginFrame()` and shared by
+every row, rather than each row calling the system for itself; `SystemStats` is
+fetched lazily by `Data.stats()` on the slow tier, so it is off the draw path
+altogether.
 
 Nothing caches to `Application.Storage` — that hits the filesystem and would
 cost more than it saves. It is plain in-memory state, bounded, rebuilt on launch.
@@ -444,8 +445,8 @@ all.
 | Time / date | instant | date text rebuilt at local midnight |
 | Steps | continuous in firmware | shown live on gesture |
 | DND / alarm / notification count | instant | shown live on gesture |
-| Battery % | slow (tens of minutes for 1%) | read per frame anyway, it is free |
-| Battery days | periodic firmware estimate | cached 5 min |
+| Battery % | slow (tens of minutes for 1%) | cached 5 min |
+| Battery days | periodic firmware estimate | cached 5 min, same snapshot |
 | Body Battery | SensorHistory sample every few minutes | cached 5 min |
 | Graph — heart rate | history sample ~1-2 min at rest | faster during activity; cached 5 min |
 | Graph — stress / Pulse Ox | minutes (stress) to ~hourly (Pulse Ox) | cached 5 min |
@@ -539,8 +540,8 @@ If the colour should be user-selectable instead, see *Add a setting*.
    history iterator or changes slower than a minute, cache it — follow
    `batteryDays()`: an `mFooAt` timestamp plus an early
    `if (fresh(mFooAt)) { return mFoo; }`.
-3. If it needs `DeviceSettings` or `SystemStats`, use the frame snapshot
-   (`mSettings` / `mStats`) — never call the system again.
+3. If it needs `DeviceSettings` use the frame snapshot (`mSettings`); if it
+   needs `SystemStats` call `stats()`. Never call either system API directly.
 4. In the relevant `draw*` method, call it, and `if (value == null) { return; }`
    or skip just that piece.
 5. Place it with a fraction of `mWidth` / `mHeight`, or measure it with

@@ -40,14 +40,15 @@ module GraphSource {
 //! Reads are therefore in three tiers:
 //!
 //! - **Per frame** (cheap, and genuinely wanted fresh on every gesture): the
-//!   clock, `DeviceSettings` (DND / alarms / notifications), `SystemStats`
-//!   (battery), and the step count. Each of the two system snapshots is taken
-//!   exactly once per frame in `beginFrame()` and shared by every row that
-//!   wants it, instead of three or four separate calls.
+//!   clock, `DeviceSettings` (DND / alarms / notification count) and the step
+//!   count. The `DeviceSettings` snapshot is taken exactly once per frame in
+//!   `beginFrame()` and shared by every row that wants it, instead of the five
+//!   separate calls this used to make.
 //! - **Every `SLOW_TTL` seconds**: anything that walks a `SensorHistory`
-//!   iterator (the graph, Body Battery) plus weather and the battery-days
-//!   estimate. These move on a scale of minutes at best; re-reading them at
-//!   1 Hz is pure battery burn.
+//!   iterator (the graph, Body Battery), plus weather and the `SystemStats`
+//!   snapshot behind the battery percentage and days-remaining figures. These
+//!   move on a scale of minutes at best; re-reading them at 1 Hz is pure
+//!   battery burn.
 //! - **Once a day / once per settings change**: sunrise and sunset, the date
 //!   string, and the app properties.
 //!
@@ -65,7 +66,6 @@ module Data {
   // Taken once per onUpdate by beginFrame(); every getter below reads these
   // rather than calling the system again.
   var mSettings = null;
-  var mStats = null;
   var mClock = null;
   var mNowSec as Number = 0;
   var mLocalDay as Number = -1;
@@ -81,8 +81,8 @@ module Data {
   var mConditions = null;
   var mConditionsAt as Number = -1;
 
-  var mBatteryDays = null;
-  var mBatteryDaysAt as Number = -1;
+  var mStats = null;
+  var mStatsAt as Number = -1;
 
   var mSunDay as Number = -1;
   var mSunTriedAt as Number = -1;
@@ -106,7 +106,6 @@ module Data {
   function beginFrame() as Void {
     mClock = System.getClockTime();
     mSettings = System.getDeviceSettings();
-    mStats = System.getSystemStats();
     mNowSec = Time.now().value();
 
     // Local day index, so the date text and the sun times roll over at local
@@ -397,7 +396,7 @@ module Data {
     return null;
   }
 
-  // ------------------------------------------------------- per-frame values
+  // --------------------------------------------------- steps and the battery
 
   //! Read every frame on purpose: the user wants a fresh count the moment they
   //! raise their wrist, and ActivityMonitor.getInfo() is a cheap local read.
@@ -416,28 +415,34 @@ module Data {
     return (count / 1000.0).format("%.1f") + "k";
   }
 
-  function batteryPercent() as Number {
-    return Math.round(mStats.battery).toNumber();
+  //! The SystemStats snapshot, refreshed on the slow tier rather than per
+  //! frame. Battery percentage takes tens of minutes to move a single point
+  //! and the days-remaining figure is a periodic firmware estimate, so there
+  //! is nothing a 1 Hz read could show that a five-minute-old one does not —
+  //! and this is the only caller of System.getSystemStats(), so caching it
+  //! takes that allocation out of the draw path entirely.
+  function stats() {
+    if (!fresh(mStatsAt)) {
+      mStatsAt = mNowSec;
+      mStats = System.getSystemStats();
+    }
+    return mStats;
   }
 
-  //! Cached: the firmware's own estimate moves on a scale of tens of minutes.
-  //!
-  //! Each of these copies the field into a local before testing it — the type
-  //! checker narrows locals but not fields, so `x.y != null && x.y.z()` does
-  //! not typecheck the way it reads.
+  function batteryPercent() as Number {
+    return Math.round(stats().battery).toNumber();
+  }
+
+  //! Copies the field into a local before testing it — the type checker
+  //! narrows locals but not fields, so `x.y != null && x.y.z()` does not
+  //! typecheck the way it reads.
   function batteryDays() as Number? {
-    if (fresh(mBatteryDaysAt)) {
-      return mBatteryDays;
+    var s = stats();
+    if (!(s has :batteryInDays)) {
+      return null;
     }
-    mBatteryDaysAt = mNowSec;
-    mBatteryDays = null;
-    if (mStats has :batteryInDays) {
-      var days = mStats.batteryInDays;
-      if (days != null) {
-        mBatteryDays = days.toNumber();
-      }
-    }
-    return mBatteryDays;
+    var days = s.batteryInDays;
+    return days == null ? null : days.toNumber();
   }
 
   function notificationCount() as Number {

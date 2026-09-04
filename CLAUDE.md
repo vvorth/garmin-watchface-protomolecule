@@ -94,11 +94,12 @@ shifts.
   every read there is behind a `has` check, a null check, or a `try`. A missing
   sensor must drop its element, never crash the face.
 - **Respect the refresh tiers in `Data.mc`.** `Data.beginFrame()` takes one
-  `DeviceSettings` and one `SystemStats` per frame — never call those again from
-  a `draw*` method. Anything that walks a `SensorHistory` iterator, hits
-  Weather, or changes slower than a minute goes behind `fresh(mFooAt)` with the
-  `SLOW_TTL`; only cheap values the user wants live on a wrist raise (steps,
-  DND, alarm, notification count, battery %) are read per frame.
+  `DeviceSettings` per frame and `Data.stats()` caches `SystemStats` on the slow
+  tier — never call either system API again from a `draw*` method. Anything that
+  walks a `SensorHistory` iterator, hits Weather, or changes slower than a
+  minute goes behind `fresh(mFooAt)` with the `SLOW_TTL`; only cheap values the
+  user wants live on a wrist raise (steps, DND, alarm, notification count) are
+  read per frame.
 - **Property values are cached.** Any code path that writes a property must call
   `Data.invalidateProperties()` or the change will not take effect. Note
   `onSettingsChanged` fires only for Garmin Connect pushes, not on-watch edits.
