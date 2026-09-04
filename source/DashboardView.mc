@@ -164,9 +164,9 @@ class DashboardView extends WatchUi.WatchFace {
     }
     var condition = conditions has :condition ? conditions.condition : null;
 
-    var iconRadius = mWidth * 0.040;
-    var pad = mWidth * 0.030; // icon edge to the nearest field
-    var gap = mWidth * 0.022; // between the two fields on one side
+    var iconRadius = mWidth * Layout.WEATHER_ICON_R;
+    var pad = mWidth * Layout.WEATHER_PAD;
+    var gap = mWidth * Layout.WEATHER_GAP;
 
     Icons.weather(dc, Icons.forCondition(condition), mCenterX, y, iconRadius, Theme.TEXT);
 
@@ -242,7 +242,7 @@ class DashboardView extends WatchUi.WatchFace {
     var hours = is24Hour ? hour.format("%02d") : hour.format("%d");
     var minutes = clock.min.format("%02d");
 
-    var gap = mWidth * 0.020;
+    var gap = mWidth * Layout.TIME_GAP;
     var y = Layout.TIME_Y * mHeight + offsetY;
 
     // 24h: gap centred on the screen. 12h: whole block centred.
@@ -270,16 +270,16 @@ class DashboardView extends WatchUi.WatchFace {
   //! they were at the last minute boundary.
   hidden function drawStatusRow(dc as Graphics.Dc, bodyBattery as Number?) as Void {
     var y = Layout.STATUS_Y * mHeight;
-    var iconRadius = mWidth * 0.044;
+    var iconRadius = mWidth * Layout.STATUS_ICON_R;
 
     dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mWidth * 0.175, y, mRowFont, bodyBattery == null ? "--" : bodyBattery.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.drawText(mWidth * Layout.BODY_BATTERY_X, y, mRowFont, bodyBattery == null ? "--" : bodyBattery.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-    Icons.doNotDisturb(dc, mWidth * 0.335, y, iconRadius, Data.doNotDisturb() ? Theme.DND_ON : Theme.OFF);
+    Icons.doNotDisturb(dc, mWidth * Layout.DND_X, y, iconRadius, Data.doNotDisturb() ? Theme.DND_ON : Theme.OFF);
     Icons.alarm(dc, mCenterX, y, iconRadius, Data.alarmSet() ? Theme.ALARM_ON : Theme.OFF);
 
     dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mWidth * 0.775, y, mRowFont, Data.formatSteps(Data.steps()), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.drawText(mWidth * Layout.STEPS_X, y, mRowFont, Data.formatSteps(Data.steps()), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
   //! Estimated days of battery left, notification badge, battery percentage.
@@ -292,8 +292,8 @@ class DashboardView extends WatchUi.WatchFace {
     var bottom = mCenterY + mRadius - Theme.ARC_EDGE_INSET - Theme.ARC_FILL_PEN - 1; // 1 px inside the fill arc
     // 0.95: a touch smaller than the full slot. +2: nudged down off the
     // separator so it does not look like it is clinging to it.
-    var radius = (bottom - top) / Icons.NOTIFICATION_SPAN * 0.95;
-    var y = top + radius * 0.75 + 2;
+    var radius = (bottom - top) / Icons.NOTIFICATION_SPAN * Layout.NOTIFICATION_FILL;
+    var y = top + radius * 0.75 + Layout.NOTIFICATION_NUDGE;
 
     var count = Data.notificationCount();
     Icons.notification(dc, mCenterX, y, radius, count > 0 ? Theme.NOTIFICATION_ON : Theme.OFF);
@@ -309,9 +309,9 @@ class DashboardView extends WatchUi.WatchFace {
     dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
     var days = Data.batteryDays();
     if (days != null) {
-      dc.drawText(mWidth * 0.32, textY, mSmallFont, days.format("%d") + "d", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+      dc.drawText(mWidth * Layout.BATTERY_DAYS_X, textY, mSmallFont, days.format("%d") + "d", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
-    dc.drawText(mWidth * 0.68, textY, mSmallFont, Data.batteryPercent().format("%d") + "%", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.drawText(mWidth * Layout.BATTERY_PERCENT_X, textY, mSmallFont, Data.batteryPercent().format("%d") + "%", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
   hidden function drawArcs(dc as Graphics.Dc, bodyBattery as Number?) as Void {

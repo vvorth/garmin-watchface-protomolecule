@@ -9,12 +9,12 @@ module Graph {
   const MIN_BAR as Float = 0.12;
 
   function barWidth(screenWidth as Numeric) as Number {
-    var w = Math.round(screenWidth * 0.0154).toNumber();
+    var w = Math.round(screenWidth * Layout.GRAPH_BAR_W).toNumber();
     return w < 2 ? 2 : w;
   }
 
   function pitch(screenWidth as Numeric) as Number {
-    var gap = Math.round(screenWidth * 0.0192).toNumber();
+    var gap = Math.round(screenWidth * Layout.GRAPH_BAR_GAP).toNumber();
     return barWidth(screenWidth) + (gap < 2 ? 2 : gap);
   }
 

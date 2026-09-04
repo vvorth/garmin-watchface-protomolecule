@@ -226,9 +226,10 @@ returns `null` and the view leaves that element out.
 
 ## 5. Geometry: fractions & the round screen
 
-Nothing is hard-coded to 260&nbsp;&times;&nbsp;260. The whole vertical layout
-lives in the `Layout` module as fractions of screen height, measured off the
-reference design:
+Nothing is hard-coded to 260&nbsp;&times;&nbsp;260. The whole layout lives in
+the `Layout` module in `source/Theme.mc` as fractions — **of screen height for
+anything vertical, of screen width for anything horizontal** — measured off the
+reference design. That module is the single place to tune the layout:
 
 ```monkeyc
 // source/Theme.mc — module Layout
@@ -238,18 +239,52 @@ const SEP_1_Y  as Float = 0.112;   // separator hairlines
 const TIME_Y   as Float = 0.507;
 // … SEP_4_Y, STATUS_Y, SEP_5_Y, BATTERY_Y
 
+// --- horizontal (x screen width) ---
+const BODY_BATTERY_X as Float = 0.175;   // status row, left to right
+const DND_X          as Float = 0.335;
+const STEPS_X        as Float = 0.775;
+const BATTERY_DAYS_X as Float = 0.32;    // battery row
+const BATTERY_PERCENT_X as Float = 0.68;
+// … STATUS_ICON_R, WEATHER_ICON_R, WEATHER_PAD, WEATHER_GAP, TIME_GAP,
+//   NOTIFICATION_FILL, NOTIFICATION_NUDGE, GRAPH_BAR_W, GRAPH_BAR_GAP
+
 const SEPARATOR_RADIUS as Float = 0.94;  // circle the hairline ends ride
 
 // Arc tracks: Garmin degrees run counter-clockwise from 3 o'clock,
 // so 270 is straight down.
-const ARC_LEFT_FROM  as Number = 237;
+const ARC_LEFT_FROM  as Number = 238;
 const ARC_LEFT_TO    as Number = 205;
 // … ARC_CENTER, ARC_CENTER_SPREAD, ARC_RIGHT_*, ARC_TRACK_PEN, ARC_FILL_PEN, ARC_EDGE_INSET
 ```
 
-At draw time a fraction becomes a pixel: `Layout.TIME_Y * mHeight`. Horizontal
-placement inside a row uses fractions of `mWidth` (`mWidth * 0.335`) or is
-measured from the text itself with `dc.getTextDimensions(...)`.
+At draw time a fraction becomes a pixel: `Layout.TIME_Y * mHeight` vertically,
+`Layout.STEPS_X * mWidth` horizontally.
+
+### Moving something sideways
+
+Only the things that are **not** screen-centred need a constant. The clock, the
+date, the weather icon, the alarm icon and the notification badge are all
+centred, so they have none — the rest are one edit each:
+
+| Move this | Change |
+| --- | --- |
+| Body Battery / DND / steps | `BODY_BATTERY_X`, `DND_X`, `STEPS_X` |
+| Battery days / percentage | `BATTERY_DAYS_X`, `BATTERY_PERCENT_X` |
+| Size of the DND & alarm icons | `STATUS_ICON_R` |
+| Weather icon size, and how far the readings sit from it | `WEATHER_ICON_R`, `WEATHER_PAD`, `WEATHER_GAP` |
+| Gap between hours and minutes | `TIME_GAP` |
+| Notification badge size / vertical nudge | `NOTIFICATION_FILL`, `NOTIFICATION_NUDGE` |
+| Graph bar thickness and spacing | `GRAPH_BAR_W`, `GRAPH_BAR_GAP` |
+
+The weather row and the four readings in it are positioned *relative to the
+centred icon* rather than at fixed x values, so the row stays balanced whatever
+the temperatures read; `drawFieldLeft` / `drawFieldRight` walk outwards from the
+icon using `dc.getTextDimensions(...)`. The same is true of the clock in
+12-hour mode.
+
+**Nothing in a `draw*` method should hard code a fraction.** If you need a new
+one, add it to `Layout` — `tools/preview.py` parses that module, so a constant
+defined there is picked up by the preview with no mirroring.
 
 ### chord() — the taper
 
@@ -475,8 +510,8 @@ palette.
 
 It stays honest in two halves:
 
-- **The colours and the `Layout` fractions are parsed out of `Theme.mc` at
-  runtime** — those can never drift.
+- **The colours and every `Layout` constant — vertical *and* horizontal — are
+  parsed out of `Theme.mc` at runtime.** Those can never drift.
 - **The per-row geometry inside each `draw*` method (the `0.040`, `0.335`,
   `* 0.95` literals) is a hand copy.** The Python `draw_*` methods mirror the
   Monkey C ones line for line.
@@ -499,13 +534,14 @@ python3 tools/preview.py --sleep out.png
 Almost every change is one of these.
 
 <details>
-<summary><b>Move a row up or down</b></summary>
+<summary><b>Move something up, down, or sideways</b></summary>
 
-1. Change the row's `*_Y` constant in `Theme.mc` (module `Layout`). Nudge
-   neighbouring separators if it now crowds them.
-2. Nothing to change in `preview.py` — it reads the `Layout` constants straight
-   from `Theme.mc`.
-3. `python3 tools/preview.py preview.png`, eyeball, repeat.
+1. **Vertically:** change the row's `*_Y` constant in `Theme.mc` (module
+   `Layout`). Nudge the neighbouring separators if it now crowds them.
+2. **Horizontally:** change the matching `*_X` constant. Screen-centred elements
+   (clock, date, weather icon, alarm, notification badge) have none by design.
+3. Nothing to change in `preview.py` — it parses `Layout` out of `Theme.mc`.
+4. `python3 tools/preview.py preview.png`, eyeball, repeat.
 </details>
 
 <details>

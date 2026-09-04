@@ -134,11 +134,11 @@ it renders at each device's real resolution, and for the transflective (MIP)
 devices it snaps every pixel to the 64-colour panel palette, so a colour that
 would dither on the watch dithers here too.
 
-The colour palette and the `Layout` fractions are **read out of
-`source/Theme.mc`** when the script runs, so those never drift. The per-row
-geometry inside the `draw*` methods is still a hand copy of
+The colour palette and every `Layout` constant — positions, sizes, spacings, on
+both axes — are **read out of `source/Theme.mc`** when the script runs, so those
+never drift. Only the *shape* of the drawing is a hand copy of
 `source/DashboardView.mc` (and `Arcs.mc` / `Graph.mc` / `Icons.mc`) — keep the
-two in step when you edit a `draw` method.
+two in step when you change how something is drawn.
 
 The real check is still `monkeydo bin/dashboard-fenix8solar47mm.prg
 fenix8solar47mm` against a debug build.
@@ -203,12 +203,15 @@ docs/brief.md                    the original request, one row at a time
 
 ### Layout
 
-`source/Theme.mc` holds the whole vertical layout as fractions of the screen
-height, measured off the reference design. Everything else derives from the
-screen size at run time, so the face is not tied to 260×260: the separator lines
-follow the chord of a circle just inside the bezel, and the graph fits as many
-bars as the width allows. Text is `FONT_XTINY` / `FONT_TINY` (the firmware sizes
-those per device); only the clock is a fixed-size bitmap.
+`source/Theme.mc` holds the whole layout in its `Layout` module, as fractions of
+the screen height (anything vertical) or width (anything horizontal), measured
+off the reference design. It is the single place to tune positions, sizes and
+spacings — see [`docs/internals.md` §5](docs/internals.md#5-geometry-fractions--the-round-screen)
+for which constant moves what. Everything derives from the screen size at run
+time, so the face is not tied to 260×260: the separator lines follow the chord
+of a circle just inside the bezel, and the graph fits as many bars as the width
+allows. Text is `FONT_XTINY` / `FONT_TINY` (the firmware sizes those per
+device); only the clock is a fixed-size bitmap.
 
 ### Colours
 

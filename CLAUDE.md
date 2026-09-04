@@ -60,8 +60,11 @@ framework lifecycle, module map, the settings/data-refresh model, and change
 recipes. Read it before a non-trivial change; keep it current when the structure
 shifts.
 
-- **Layout lives in `source/Theme.mc`** as fractions of screen height, measured
-  off the reference image. Nothing is hard coded to 260×260.
+- **Layout lives in `source/Theme.mc`** (module `Layout`) as fractions — of
+  screen height for anything vertical, of screen width for anything horizontal.
+  Nothing is hard coded to 260×260, and **no `draw*` method should contain a
+  bare fraction**; add a constant to `Layout` instead. Screen-centred elements
+  (clock, date, weather icon, alarm, notification badge) need no X constant.
 - **`tools/preview.py` renders a PNG** so layout changes can be checked without
   the simulator:
   ```sh
@@ -72,13 +75,14 @@ shifts.
   ```
   It is a mock, not an emulator — fixed sample data, DejaVu standing in for the
   Garmin system fonts (but the real Chivo for the clock). It **parses
-  `source/Theme.mc` at run time**, so the colour palette and the `Layout`
-  fractions never need copying by hand. What is still mirrored by hand is the
-  per-row geometry inside the `draw*` methods (the `0.042`, `0.395`, … literals):
-  **when you touch a `draw` method in `DashboardView.mc` / `Arcs.mc` /
-  `Graph.mc` / `Icons.mc`, change the matching method in `preview.py`.** For
-  transflective devices it snaps every pixel to the 64-colour MIP palette, so
-  dithering shows up in the preview.
+  `source/Theme.mc` at run time**, so the colour palette and every `Layout`
+  constant are picked up for free. What is still mirrored by hand is the *shape*
+  of the drawing — the icon vertex maths in `Icons.mc`, the bar/arc geometry in
+  `Graph.mc` / `Arcs.mc`, and the order of operations in each `draw*` method:
+  **when you change how something is drawn, change the matching method in
+  `preview.py`.** Moving or resizing something via a `Layout` constant needs no
+  preview change at all. For transflective devices it snaps every pixel to the
+  64-colour MIP palette, so dithering shows up in the preview.
 - **Fonts.** The clock is a Chivo bitmap font in `resources/fonts/`, generated
   by `tools/make_clock_font.py` from `tools/fonts/Chivo[wght].ttf` (SIL OFL) —
   Connect IQ has no runtime rasteriser, so custom faces ship as an AngelCode

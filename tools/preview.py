@@ -174,6 +174,22 @@ ARC_CENTER_SPREAD = T["ARC_CENTER_SPREAD"]
 ARC_RIGHT_FROM = T["ARC_RIGHT_FROM"]
 ARC_RIGHT_TO = T["ARC_RIGHT_TO"]
 
+# Horizontal layout (source/Theme.mc, module Layout) — parsed, not mirrored.
+BODY_BATTERY_X = T["BODY_BATTERY_X"]
+DND_X = T["DND_X"]
+STEPS_X = T["STEPS_X"]
+STATUS_ICON_R = T["STATUS_ICON_R"]
+BATTERY_DAYS_X = T["BATTERY_DAYS_X"]
+BATTERY_PERCENT_X = T["BATTERY_PERCENT_X"]
+NOTIFICATION_FILL = T["NOTIFICATION_FILL"]
+NOTIFICATION_NUDGE = T["NOTIFICATION_NUDGE"]
+WEATHER_ICON_R = T["WEATHER_ICON_R"]
+WEATHER_PAD = T["WEATHER_PAD"]
+WEATHER_GAP = T["WEATHER_GAP"]
+TIME_GAP = T["TIME_GAP"]
+GRAPH_BAR_W = T["GRAPH_BAR_W"]
+GRAPH_BAR_GAP = T["GRAPH_BAR_GAP"]
+
 
 def find_font_path():
     for path in FONT_CANDIDATE_PATHS:
@@ -312,9 +328,9 @@ class Face:
 
     def draw_weather(self):
         y = WEATHER_Y * self.h
-        icon_r = self.w * 0.040
-        pad = self.w * 0.030
-        gap = self.w * 0.022
+        icon_r = self.w * WEATHER_ICON_R
+        pad = self.w * WEATHER_PAD
+        gap = self.w * WEATHER_GAP
         current, precip = SAMPLE["temp"], SAMPLE["precip"]
         high, low = SAMPLE["high"], SAMPLE["low"]
 
@@ -357,7 +373,7 @@ class Face:
         hours, minutes = SAMPLE["hours"], SAMPLE["minutes"]
         hcol = TEXT_DIM if dim else (rgb(T[SAMPLE["hour_color"]]) if SAMPLE["hour_color"] else HOURS)
         mcol = TEXT_DIM if dim else (rgb(T[SAMPLE["minute_color"]]) if SAMPLE["minute_color"] else MINUTES)
-        gap = self.w * 0.020
+        gap = self.w * TIME_GAP
         y = TIME_Y * self.h + offset_y
 
         hours_right = self.cx - gap / 2.0
@@ -374,21 +390,21 @@ class Face:
 
     def draw_status_row(self):
         y = STATUS_Y * self.h
-        icon_r = self.w * 0.044
+        icon_r = self.w * STATUS_ICON_R
         bb = SAMPLE["body_battery"]
-        self.text(self.w * 0.175, y, self.row_font,
+        self.text(self.w * BODY_BATTERY_X, y, self.row_font,
                   "--" if bb is None else str(bb), TEXT_DIM, align="center")
-        Icons.do_not_disturb(self, self.w * 0.335, y, icon_r, DND_ON if SAMPLE["dnd"] else OFF)
+        Icons.do_not_disturb(self, self.w * DND_X, y, icon_r, DND_ON if SAMPLE["dnd"] else OFF)
         Icons.alarm(self, self.cx, y, icon_r, ALARM_ON if SAMPLE["alarm"] else OFF)
-        self.text(self.w * 0.775, y, self.row_font, SAMPLE["steps"], TEXT_DIM, align="center")
+        self.text(self.w * STEPS_X, y, self.row_font, SAMPLE["steps"], TEXT_DIM, align="center")
 
     def draw_battery_row(self):
         # Icons.notification spans y - 0.75r .. y + 0.85r (Icons.NOTIFICATION_SPAN);
         # grow it to fill between the separator above and the arc below, 1 px clear.
         top = SEP_5_Y * self.h + 1
         bottom = self.cy + self.radius - ARC_EDGE_INSET - ARC_FILL_PEN - 1
-        radius = (bottom - top) / Icons.NOTIFICATION_SPAN * 0.95
-        y = top + radius * 0.75 + 2
+        radius = (bottom - top) / Icons.NOTIFICATION_SPAN * NOTIFICATION_FILL
+        y = top + radius * 0.75 + NOTIFICATION_NUDGE
 
         count = SAMPLE["notifications"]
         Icons.notification(self, self.cx, y, radius, NOTIFICATION_ON if count > 0 else OFF)
@@ -397,8 +413,8 @@ class Face:
             self.text(self.cx, text_y, self.badge_font, str(count), NOTIFICATION_TEXT, align="center")
 
         if SAMPLE["battery_days"] is not None:
-            self.text(self.w * 0.32, text_y, self.small_font, SAMPLE["battery_days"], TEXT_DIM, align="center")
-        self.text(self.w * 0.68, text_y, self.small_font, SAMPLE["battery_pct"], TEXT_DIM, align="center")
+            self.text(self.w * BATTERY_DAYS_X, text_y, self.small_font, SAMPLE["battery_days"], TEXT_DIM, align="center")
+        self.text(self.w * BATTERY_PERCENT_X, text_y, self.small_font, SAMPLE["battery_pct"], TEXT_DIM, align="center")
 
     def draw_arcs(self):
         Arcs.draw(self, self.cx, self.cy, self.radius,
@@ -460,11 +476,11 @@ class Graph:
 
     @staticmethod
     def bar_width(w):
-        return max(2, round(w * 0.0154))
+        return max(2, round(w * GRAPH_BAR_W))
 
     @staticmethod
     def pitch(w):
-        return Graph.bar_width(w) + max(2, round(w * 0.0192))
+        return Graph.bar_width(w) + max(2, round(w * GRAPH_BAR_GAP))
 
     @staticmethod
     def bucket_count(w, half):

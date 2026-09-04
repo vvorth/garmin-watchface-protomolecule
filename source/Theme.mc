@@ -50,11 +50,18 @@ module Theme {
   const ARC_EDGE_INSET as Number = 1;
 }
 
-//! Vertical layout of the face, as fractions of the screen height.
+//! Layout of the face. Every position and size is a fraction — of the screen
+//! height for anything vertical, of the screen width for anything horizontal —
+//! so the same face works on every round screen size. The numbers were measured
+//! off the reference rendering.
 //!
-//! The numbers were measured off the reference rendering; keeping them as
-//! fractions makes the same face work on every round screen size.
+//! This module is the one place to tune the layout. Nothing in the `draw*`
+//! methods should hard code a fraction; if you find yourself typing `mWidth *
+//! 0.3` in the view, add a constant here instead. `tools/preview.py` parses
+//! this file, so anything defined here is picked up by the preview for free.
 module Layout {
+  // ---------------------------------------------- vertical (× screen height)
+  // Row centres and the separator hairlines between them, top to bottom.
   const DATE_Y as Float = 0.066;
   const SEP_1_Y as Float = 0.112;
   const WEATHER_Y as Float = 0.163;
@@ -67,6 +74,39 @@ module Layout {
   const STATUS_Y as Float = 0.754;
   const SEP_5_Y as Float = 0.828;
   const BATTERY_Y as Float = 0.884;
+
+  // ----------------------------------------------- horizontal (× screen width)
+  // Centre lines for the things that are not centred on the screen. Anything
+  // missing here (the alarm icon, the weather icon, the notification badge, the
+  // clock) is centred on the screen and needs no constant.
+
+  // Status row: Body Battery, do-not-disturb, [alarm centred], steps.
+  const BODY_BATTERY_X as Float = 0.175;
+  const DND_X as Float = 0.335;
+  const STEPS_X as Float = 0.775;
+  const STATUS_ICON_R as Float = 0.044;
+
+  // Battery row: days remaining, [notification badge centred], percentage.
+  const BATTERY_DAYS_X as Float = 0.32;
+  const BATTERY_PERCENT_X as Float = 0.68;
+  //! Badge size as a fraction of the slot between the separator and the arc,
+  //! plus the downward nudge in pixels that keeps it off the separator.
+  const NOTIFICATION_FILL as Float = 0.95;
+  const NOTIFICATION_NUDGE as Number = 2;
+
+  // Weather row: the condition icon is centred and the four readings mirror
+  // outwards from it, so only the icon size and the two spacings are needed.
+  const WEATHER_ICON_R as Float = 0.040;
+  const WEATHER_PAD as Float = 0.030; // icon edge to the nearest reading
+  const WEATHER_GAP as Float = 0.022; // between the two readings on one side
+
+  //! The gap between the hours and the minutes. In 24-hour mode it straddles
+  //! the screen centre line; in 12-hour mode the whole block is centred.
+  const TIME_GAP as Float = 0.020;
+
+  // Graph bars.
+  const GRAPH_BAR_W as Float = 0.0154;
+  const GRAPH_BAR_GAP as Float = 0.0192;
 
   //! Radius of the circle that the separator ends follow, relative to the
   //! screen radius. Slightly inside the screen so lines never touch the bezel.
