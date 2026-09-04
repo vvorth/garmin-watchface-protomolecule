@@ -81,14 +81,14 @@ module Layout {
   // clock) is centred on the screen and needs no constant.
 
   // Status row: Body Battery, do-not-disturb, [alarm centred], steps.
-  const BODY_BATTERY_X as Float = 0.175;
-  const DND_X as Float = 0.335;
+  const BODY_BATTERY_X as Float = 0.195;
+  const DND_X as Float = 0.345;
   const STEPS_X as Float = 0.775;
   const STATUS_ICON_R as Float = 0.044;
 
   // Battery row: days remaining, [notification badge centred], percentage.
-  const BATTERY_DAYS_X as Float = 0.32;
-  const BATTERY_PERCENT_X as Float = 0.68;
+  const BATTERY_DAYS_X as Float = 0.34;
+  const BATTERY_PERCENT_X as Float = 0.66;
   //! Badge size as a fraction of the slot between the separator and the arc,
   //! plus the downward nudge in pixels that keeps it off the separator.
   const NOTIFICATION_FILL as Float = 0.95;
@@ -97,7 +97,7 @@ module Layout {
   // Weather row: the condition icon is centred and the four readings mirror
   // outwards from it, so only the icon size and the two spacings are needed.
   const WEATHER_ICON_R as Float = 0.040;
-  const WEATHER_PAD as Float = 0.030; // icon edge to the nearest reading
+  const WEATHER_PAD as Float = 0.022; // icon edge to the nearest reading
   const WEATHER_GAP as Float = 0.022; // between the two readings on one side
 
   //! The gap between the hours and the minutes. In 24-hour mode it straddles

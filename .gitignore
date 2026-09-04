@@ -12,3 +12,4 @@ __pycache__/
 # preview renders (docs/preview.png is committed on purpose)
 /preview.png
 /tools/preview-*.png
+.DS_Store
