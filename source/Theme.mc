@@ -74,12 +74,12 @@ module Layout {
 
   // Arc tracks along the bottom edge. Garmin measures degrees counter
   // clockwise from the 3 o'clock position, so 270 is the bottom of the screen.
-  const ARC_LEFT_FROM as Number = 237; // body battery grows towards ARC_LEFT_TO
+  const ARC_LEFT_FROM as Number = 238; // body battery grows towards ARC_LEFT_TO
   const ARC_LEFT_TO as Number = 205;
   const ARC_CENTER as Number = 270; // device battery grows both ways from here
-  const ARC_CENTER_SPREAD as Number = 23;
+  const ARC_CENTER_SPREAD as Number = 28;
   // Daylight is anchored at the low end and grows up towards ARC_RIGHT_TO, so
   // it fills to full at sunrise and then retracts from the top down all day.
-  const ARC_RIGHT_FROM as Number = 303;
+  const ARC_RIGHT_FROM as Number = 302;
   const ARC_RIGHT_TO as Number = 335;
 }

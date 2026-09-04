@@ -1,6 +1,7 @@
 .project
 /.idea
 /bin
+/dashboard
 *.iml
 *.code-workspace
 .vscode
