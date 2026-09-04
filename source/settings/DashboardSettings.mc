@@ -56,12 +56,16 @@ module SettingsMenu {
     return Lang.format(WatchUi.loadResource(Rez.Strings.HoursSuffix), [hours.format("%d")]);
   }
 
+  //! Writing from the on-watch menu does not go through the app's
+  //! onSettingsChanged (that fires only for values pushed from Garmin
+  //! Connect), so the cached copy in Data has to be dropped here.
   function store(key as String, value as Number) as Void {
     try {
       Properties.setValue(key, value);
     } catch (e) {
       // A read-only property store is not worth crashing the face over.
     }
+    Data.invalidateProperties();
   }
 }
 

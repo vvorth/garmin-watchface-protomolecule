@@ -2,8 +2,6 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
 import Toybox.System;
-import Toybox.Time;
-import Toybox.Time.Gregorian;
 import Toybox.WatchUi;
 
 //! The watch face itself.
@@ -57,7 +55,18 @@ class DashboardView extends WatchUi.WatchFace {
     mBadgeFont = Graphics.FONT_TINY;
   }
 
+  //! Draws the whole face, every time.
+  //!
+  //! This runs **once a second** while the watch is in high power mode — which
+  //! is what a wrist-raise puts it in, for about ten seconds — and once a
+  //! minute otherwise. Every frame redraws from scratch on purpose: Garmin's
+  //! guidance is to assume nothing of the previous frame survives, and skipping
+  //! the draw blanks the screen on some devices. The cost of the 1 Hz burst is
+  //! kept down in `Data` instead, which caches everything that cannot actually
+  //! change that fast (see the tier comment there).
   function onUpdate(dc as Graphics.Dc) as Void {
+    Data.beginFrame();
+
     if (dc has :clearClip) {
       dc.clearClip();
     }
@@ -74,9 +83,7 @@ class DashboardView extends WatchUi.WatchFace {
     }
     mBurnInEnteredAtMinute = null;
 
-    var settings = System.getDeviceSettings();
-    // Walking the body battery history is the most expensive read on the face,
-    // and both the status row and the left arc want it, so do it once.
+    // Both the status row and the left arc want this, so read it once.
     var bodyBattery = Data.bodyBattery();
 
     separator(dc, Layout.SEP_1_Y);
@@ -89,9 +96,9 @@ class DashboardView extends WatchUi.WatchFace {
     drawWeather(dc);
     drawGraph(dc);
     drawTime(dc, 0);
-    drawStatusRow(dc, settings, bodyBattery);
+    drawStatusRow(dc, bodyBattery);
     drawArcs(dc, bodyBattery);
-    drawBatteryRow(dc, settings); // after the arcs: the badge overlaps them, not the reverse
+    drawBatteryRow(dc); // after the arcs: the badge overlaps them, not the reverse
   }
 
   function onEnterSleep() as Void {
@@ -129,10 +136,8 @@ class DashboardView extends WatchUi.WatchFace {
   // ------------------------------------------------------------------- rows
 
   hidden function drawDate(dc as Graphics.Dc) as Void {
-    var now = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
-    var text = Lang.format("$1$ $2$ $3$", [now.day_of_week, now.day.format("%d"), now.month]);
     dc.setColor(Theme.DATE, Graphics.COLOR_TRANSPARENT);
-    dc.drawText(mCenterX, Layout.DATE_Y * mHeight, mDateFont, text, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    dc.drawText(mCenterX, Layout.DATE_Y * mHeight, mDateFont, Data.dateText(), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
   }
 
   //! Current temperature, chance of precipitation, today's condition and
@@ -211,12 +216,11 @@ class DashboardView extends WatchUi.WatchFace {
     var halfWidth = chord(Layout.SEP_2_Y * mHeight) - margin;
     var buckets = Graph.bucketCount(mWidth, halfWidth);
 
-    var source = Data.graphSource();
-    var values = Data.graphSeries(source, Data.graphHours(), buckets);
+    var values = Data.graph(buckets);
     if (values == null) {
       return;
     }
-    Graph.draw(dc, mWidth, mCenterX, top, bottom, values, Data.graphIsPercentage(source), Theme.GRAPH);
+    Graph.draw(dc, mWidth, mCenterX, top, bottom, values, Data.graphIsPercentage(Data.graphSource()), Theme.GRAPH);
   }
 
   //! Hours and minutes, no colon, each in its own configurable colour. 24-hour
@@ -225,8 +229,8 @@ class DashboardView extends WatchUi.WatchFace {
   //! drops the leading zero and centres the whole `H MM` block instead, so a
   //! one-digit hour still looks balanced. `offsetY` shifts it for burn-in.
   hidden function drawTime(dc as Graphics.Dc, offsetY as Numeric) as Void {
-    var clock = System.getClockTime();
-    var is24Hour = System.getDeviceSettings().is24Hour;
+    var clock = Data.clock();
+    var is24Hour = Data.settings().is24Hour;
 
     var hour = clock.hour;
     if (!is24Hour) {
@@ -261,18 +265,18 @@ class DashboardView extends WatchUi.WatchFace {
   //! Body Battery on the left, do-not-disturb next, alarm dead centre, steps on
   //! the right. Body Battery is almost always two digits and the step count
   //! three to five, so this balances left against right.
-  hidden function drawStatusRow(dc as Graphics.Dc, settings as System.DeviceSettings, bodyBattery as Number?) as Void {
+  //! DND, alarm, steps and the notification badge are all read fresh every
+  //! frame, so a wrist raise shows them as they are right now rather than as
+  //! they were at the last minute boundary.
+  hidden function drawStatusRow(dc as Graphics.Dc, bodyBattery as Number?) as Void {
     var y = Layout.STATUS_Y * mHeight;
     var iconRadius = mWidth * 0.044;
 
     dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
     dc.drawText(mWidth * 0.175, y, mRowFont, bodyBattery == null ? "--" : bodyBattery.format("%d"), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
-    var doNotDisturb = settings has :doNotDisturb && settings.doNotDisturb;
-    Icons.doNotDisturb(dc, mWidth * 0.335, y, iconRadius, doNotDisturb ? Theme.DND_ON : Theme.OFF);
-
-    var alarms = settings.alarmCount != null && settings.alarmCount > 0;
-    Icons.alarm(dc, mCenterX, y, iconRadius, alarms ? Theme.ALARM_ON : Theme.OFF);
+    Icons.doNotDisturb(dc, mWidth * 0.335, y, iconRadius, Data.doNotDisturb() ? Theme.DND_ON : Theme.OFF);
+    Icons.alarm(dc, mCenterX, y, iconRadius, Data.alarmSet() ? Theme.ALARM_ON : Theme.OFF);
 
     dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
     dc.drawText(mWidth * 0.775, y, mRowFont, Data.formatSteps(Data.steps()), Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -283,7 +287,7 @@ class DashboardView extends WatchUi.WatchFace {
   //! with a count when something is. It is grown to fill the gap between the
   //! separator above it and the arc below it, 1 px clear of each, so it is the
   //! biggest thing on the row and easy to hit at a glance.
-  hidden function drawBatteryRow(dc as Graphics.Dc, settings as System.DeviceSettings) as Void {
+  hidden function drawBatteryRow(dc as Graphics.Dc) as Void {
     var top = Layout.SEP_5_Y * mHeight + 1;
     var bottom = mCenterY + mRadius - Theme.ARC_EDGE_INSET - Theme.ARC_FILL_PEN - 1; // 1 px inside the fill arc
     // 0.95: a touch smaller than the full slot. +2: nudged down off the
@@ -291,7 +295,7 @@ class DashboardView extends WatchUi.WatchFace {
     var radius = (bottom - top) / Icons.NOTIFICATION_SPAN * 0.95;
     var y = top + radius * 0.75 + 2;
 
-    var count = settings.notificationCount == null ? 0 : settings.notificationCount;
+    var count = Data.notificationCount();
     Icons.notification(dc, mCenterX, y, radius, count > 0 ? Theme.NOTIFICATION_ON : Theme.OFF);
 
     // The number and the flanking day/percent readouts all sit on the badge
@@ -328,7 +332,7 @@ class DashboardView extends WatchUi.WatchFace {
   //! only, dimmed, and nudged up and down over a five minute cycle so no pixel
   //! stays lit in one place.
   hidden function drawSleepFace(dc as Graphics.Dc) as Void {
-    var clock = System.getClockTime();
+    var clock = Data.clock();
     var enteredAt = mBurnInEnteredAtMinute;
     if (enteredAt == null) {
       enteredAt = clock.min;
@@ -340,13 +344,12 @@ class DashboardView extends WatchUi.WatchFace {
     }
     var offsetY = (elapsed % 5 - 2) * (mHeight / 12.0);
 
-    var now = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
     dc.setColor(Theme.TEXT_DIM, Graphics.COLOR_TRANSPARENT);
     dc.drawText(
       mCenterX,
       Layout.SEP_3_Y * mHeight + offsetY,
       mDateFont,
-      Lang.format("$1$ $2$ $3$", [now.day_of_week, now.day.format("%d"), now.month]),
+      Data.dateText(),
       Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
     );
     drawTime(dc, offsetY);

@@ -93,6 +93,15 @@ shifts.
   not have synced. `source/Data.mc` is the only place that reads watch state and
   every read there is behind a `has` check, a null check, or a `try`. A missing
   sensor must drop its element, never crash the face.
+- **Respect the refresh tiers in `Data.mc`.** `Data.beginFrame()` takes one
+  `DeviceSettings` and one `SystemStats` per frame — never call those again from
+  a `draw*` method. Anything that walks a `SensorHistory` iterator, hits
+  Weather, or changes slower than a minute goes behind `fresh(mFooAt)` with the
+  `SLOW_TTL`; only cheap values the user wants live on a wrist raise (steps,
+  DND, alarm, notification count, battery %) are read per frame.
+- **Property values are cached.** Any code path that writes a property must call
+  `Data.invalidateProperties()` or the change will not take effect. Note
+  `onSettingsChanged` fires only for Garmin Connect pushes, not on-watch edits.
 - **Colours come from the MIP 64-colour palette** — each channel one of `0x00`,
   `0x55`, `0xAA`, `0xFF`. Anything else is dithered by the firmware and looks
   grainy on the watch. One deliberate exception: `Theme.NOTIFICATION_ON`
@@ -107,9 +116,12 @@ Object-oriented, garbage collected, duck-typed with optional static types
 (`as Number`), compiled to bytecode for a small VM. Things that catch people
 out:
 
-- `onUpdate` runs **once a minute** on a memory-in-pixel screen. The Dashboard
-  face redraws completely each time and keeps no frame state; there is no
-  partial-update path because nothing ticks per second.
+- `onUpdate` runs **once a minute in low power mode and once a SECOND in high
+  power mode** (a wrist raise, ~10 s). The face redraws completely every time
+  and keeps no frame state. Never try to save power by returning early without
+  drawing — Garmin's guidance is that nothing of the previous frame is
+  guaranteed, and it blanks the screen on some devices. Save it in `Data.mc`
+  instead, which caches per tier; see `docs/internals.md` §10.
 - `X has :y` is the capability check for both modules and instance members, and
   the compiler understands it as an API-level guard.
 - Resources compile into the generated `Rez` symbol (`Rez.Strings.AppName`).

@@ -22,7 +22,7 @@ The design this was built to, and the original brief behind each row, are in
 | 2 | Current temperature · chance of precipitation · today's condition · today's high · today's low |
 | 3 | Configurable history graph (heart rate, Body Battery, stress, pressure, elevation or Pulse Ox) |
 | 4 | Time — Chivo bitmap digits, hours and minutes each a configurable colour (default white / cyan), the gap between them on the screen centre line |
-| 5 | Body Battery · do-not-disturb (red on / grey off) · alarm (yellow on / grey off) · steps (`6.8k` past 1000) — text light grey |
+| 5 | Body Battery · do-not-disturb (red on / grey off) · alarm (yellow on / grey off) · steps (`6.0k` / `13.5k` past 1000, always one decimal so the width holds still) — text light grey |
 | 6 | Battery days remaining · notification badge (orange with a count, grey and empty at zero) · battery percentage |
 | Arcs | left: Body Battery, filling upwards · centre: device battery, filling out of 6 o'clock both ways · right: daylight left, full at sunrise and empty at sunset. Each is a grey full-length track with a slightly thicker coloured fill on top. |
 
@@ -160,10 +160,13 @@ everything here:
   That is why every icon is drawn from primitives in `source/Icons.mc` and
   scales with the screen instead of shipping as a bitmap. The one bitmap
   resource is the clock font (digits only).
-- **`onUpdate` runs once a minute** on a memory-in-pixel screen like the
-  fenix 8 Solar, so the face redraws itself completely each time and keeps no
-  state between frames. There is no partial-update path because nothing on the
-  face ticks per second.
+- **`onUpdate` runs once a minute — or once a *second*.** Low power mode calls
+  it at the top of each minute; a wrist raise puts the device in high power
+  mode, where it is called every second for about ten seconds. The face redraws
+  itself completely every time and keeps no state between frames. `source/Data.mc`
+  absorbs the difference by caching anything that cannot change that fast, so a
+  gesture costs a redraw rather than a pile of sensor reads — see
+  [`docs/internals.md` §10](docs/internals.md#10-refresh-what-updates-when).
 - **Capabilities differ per device**, so every optional API is behind a
   `has` check (`SensorHistory has :getBodyBatteryHistory`) and the risky reads
   sit in `try`/`catch`. A missing sensor degrades the face; it never crashes it.

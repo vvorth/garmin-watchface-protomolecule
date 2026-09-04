@@ -14,7 +14,7 @@ the code disagree, the code is right.
 
 1. [The shape of the thing](#1-the-shape-of-the-thing)
 2. [Entry point & lifecycle](#2-entry-point--lifecycle)
-3. [One pass, once a minute](#3-one-pass-once-a-minute)
+3. [One pass per frame](#3-one-pass-per-frame)
 4. [What each file owns](#4-what-each-file-owns)
 5. [Geometry: fractions & the round screen](#5-geometry-fractions--the-round-screen)
 6. [Fonts](#6-fonts)
@@ -39,12 +39,20 @@ this codebase.
   heap. That is why there are almost no bitmaps — every icon in `Icons.mc` is
   drawn from circles, lines and polygons, and the only image resource is the
   clock font (digits only).
-- **`onUpdate` runs once a minute.** The fenix 8 Solar has a memory-in-pixel
-  (MIP) display; the face is redrawn in full each minute and keeps *no* state
-  between frames. There is no per-second tick and no partial-update path.
+- **`onUpdate` runs once a minute — except when it runs once a *second*.** The
+  device has two power modes. In low power it calls `onUpdate` at the top of
+  each minute. Raising your wrist puts it in **high power mode, where
+  `onUpdate` is called every second** for roughly ten seconds before it drops
+  back. The face is redrawn in full every time and keeps *no* frame state.
 
-Everything else — the defensive reads, the geometry expressed as fractions, the
-palette limited to 64 colours — follows from those two.
+Everything else — the tiered caching in `Data`, the defensive reads, the
+geometry expressed as fractions, the palette limited to 64 colours — follows
+from those two.
+
+> The 1 Hz burst is the single most important fact for anyone touching this
+> code. Anything you call straight from `onUpdate` runs up to **sixty times more
+> often** than the number behind it can change. See
+> [§10](#10-refresh-what-updates-when).
 
 ---
 
@@ -65,7 +73,8 @@ class DashboardApp extends Application.AppBase {
             new DashboardSettingsDelegate()];
   }
   function onSettingsChanged() as Void {
-    WatchUi.requestUpdate();                     // Connect changed a property -> redraw
+    Data.invalidateProperties();                 // Connect changed a property
+    WatchUi.requestUpdate();                     // -> reload and redraw
   }
 }
 ```
@@ -79,16 +88,22 @@ flowchart TD
     M["manifest.xml<br/>entry = DashboardApp"] -->|construct| A["DashboardApp<br/>(AppBase)"]
     A -->|getInitialView| V["DashboardView<br/>(WatchFace)"]
     V --> L["onLayout(dc) — ONCE<br/>measure screen · load fonts"]
-    L --> U["onUpdate(dc) — EVERY MINUTE<br/>clear · read state once · draw every row"]
-    U -->|next minute| U
-    V -.->|"onEnterSleep / onExitSleep"| S["set a flag · requestUpdate()"]
+    L --> U["onUpdate(dc)<br/>beginFrame · clear · draw every row"]
+    U -->|"low power: next minute"| U
+    U -->|"high power: next second"| U
+    V -.->|"onExitSleep — wrist raised, go to 1 Hz"| U
+    V -.->|"onEnterSleep — back to 1/min"| U
     A -.->|"getSettingsView, on menu-hold"| G["Menu2 + delegate"]
 ```
 
-`onLayout` fires once when the face is shown; `onUpdate` then fires every minute
-for as long as the face is on screen. `onEnterSleep` / `onExitSleep` only matter
-on AMOLED devices — this manifest targets MIP only, so that branch is currently
-dead code kept for later.
+`onLayout` fires once when the face is shown. `onUpdate` then fires **at the top
+of every minute in low power mode, and every second in high power mode** — which
+a wrist-raise gesture triggers, for about ten seconds, before the device drops
+back to low power and calls `onEnterSleep`.
+
+`onEnterSleep` / `onExitSleep` are the signal for which mode you are in. This
+face uses them only to pick the reduced burn-in variant on AMOLED devices; the
+manifest currently targets MIP only, so that branch is dead code kept for later.
 
 ### onLayout — run once, cache everything
 
@@ -115,21 +130,22 @@ function onLayout(dc as Graphics.Dc) as Void {
 
 ---
 
-## 3. One pass, once a minute
+## 3. One pass per frame
 
-`onUpdate` is the whole face. It clears the screen, reads the state it needs
-*once*, then calls one drawing function per row, top to bottom. Nothing is
-retained; next minute it all runs again.
+`onUpdate` is the whole face. It opens a frame in `Data`, clears the screen,
+then calls one drawing function per row, top to bottom. Nothing is retained
+between frames.
 
 ```monkeyc
 // source/DashboardView.mc — onUpdate(), condensed
+Data.beginFrame();              // one clock/settings/stats snapshot for the frame
+
 dc.setColor(Theme.TEXT, Theme.BACKGROUND);
 dc.clear();
 
 if (mBurnInProtection && mAsleep) { drawSleepFace(dc); return; }
 
-var settings    = System.getDeviceSettings();
-var bodyBattery = Data.bodyBattery();   // expensive; read once, share it
+var bodyBattery = Data.bodyBattery();   // wanted by two rows; read once
 
 separator(dc, Layout.SEP_1_Y);          // five hairlines that follow the round edge
 separator(dc, Layout.SEP_2_Y);
@@ -139,10 +155,16 @@ drawDate(dc);
 drawWeather(dc);
 drawGraph(dc);
 drawTime(dc, 0);
-drawStatusRow(dc, settings, bodyBattery);
+drawStatusRow(dc, bodyBattery);
 drawArcs(dc, bodyBattery);
-drawBatteryRow(dc, settings);           // after the arcs — the badge sits on top of them
+drawBatteryRow(dc);                     // after the arcs — the badge sits on top of them
 ```
+
+**Always draw the whole screen.** Garmin's guidance is to assume nothing of the
+previous frame survives, and returning early from `onUpdate` without drawing
+blanks the display on some devices. Do not try to save power by skipping the
+draw — save it by not *re-reading* data that cannot have changed, which is what
+`Data`'s cache tiers are for.
 
 Every vertical position on the face is a constant in the `Layout` module,
 expressed as a fraction of screen height. Top to bottom:
@@ -178,7 +200,7 @@ every tunable number goes in `Theme`.**
 | `DashboardApp.mc` | The `AppBase` entry class: initial view, settings view, settings-changed hook. | Almost never. |
 | `DashboardView.mc` | The face. `onLayout`, `onUpdate`, one `draw*` function per row. All positioning logic. | Changing what a row shows or where its pieces sit. |
 | `Theme.mc` | Two modules of constants: `Theme` (colours) and `Layout` (vertical fractions, arc angles, pen widths). | Recolouring, or moving/resizing any row or the arcs. |
-| `Data.mc` | Every read of watch state — sensors, weather, battery, activity, properties — each one guarded. Plus the `GraphSource` enum. | Adding a new reading, or changing how one is fetched or formatted. |
+| `Data.mc` | Every read of watch state — sensors, weather, battery, activity, properties — each one guarded, and each on a refresh tier (§10). Plus the `GraphSource` enum. | Adding a new reading, or changing how one is fetched, cached or formatted. |
 | `Graph.mc` | The history graph: how many bars fit, bar geometry, value→height scaling. | Retuning the graph's look. |
 | `Arcs.mc` | The three bottom arcs: grey track + coloured fill, the sweep maths, pen widths. | Changing arc length, thickness, direction, or colour rules. |
 | `Icons.mc` | Every icon, drawn from primitives: weather (8 shapes), DND, alarm, notification badge. Plus `forCondition()`, the weather-code lookup. | Editing an icon shape, or remapping a weather condition. |
@@ -312,13 +334,22 @@ flowchart TD
     P --> M["On-watch Menu2<br/>DashboardSettings.mc"]
     C -->|"Properties.setValue(key, …)"| Store[(shared property store)]
     M -->|"Properties.setValue(key, …)"| Store
-    Store -.->|"Data.hourColor() — read every frame"| View[DashboardView]
-    C -.->|pushed to watch| OSC["onSettingsChanged() then requestUpdate()"]
+    Store -->|"loaded on invalidate, not per frame"| Cache["Data property cache"]
+    Cache -.->|"Data.hourColor()"| View[DashboardView]
+    C -.->|"pushed to watch"| OSC["onSettingsChanged() -- invalidate + requestUpdate"]
+    M -.->|"store() -- invalidate + requestUpdate"| Cache
 ```
 
 The Connect screen edits are pushed to the watch and fire `onSettingsChanged()`;
 the on-watch menu writes directly and calls `WatchUi.requestUpdate()` itself.
 Either way the next `onUpdate` picks up the new value.
+
+> **Both write paths must call `Data.invalidateProperties()`.** `Data` caches
+> the property values rather than re-reading them every frame, so a write that
+> does not invalidate simply will not take effect. The app does it in
+> `onSettingsChanged()`; the on-watch menu does it in `SettingsMenu.store()`.
+> `onSettingsChanged` fires **only** for values pushed from Garmin Connect — it
+> is not called for an on-watch edit.
 
 The on-watch menu leans on one reusable pair: `OptionMenu` shows a flat list
 with a dot on the current choice, and `OptionDelegate` stores the picked value
@@ -369,33 +400,68 @@ rare ones would break the build if referenced by name.
 
 ## 10. Refresh: what updates when
 
-Two independent layers.
+Three things interact: how often the firmware calls `onUpdate`, how often `Data`
+lets a given read actually happen, and how often the underlying number can
+change at all.
 
-**The face re-reads everything once a minute.** It holds no cache — every
-`onUpdate` calls `Data.*` fresh and draws whatever the system has at that
-instant. `onUpdate` fires: once a minute on the minute; on wake/sleep; on a
-settings change; and when the face is first shown. There is no per-second path.
+### How often `onUpdate` runs
 
-**Each source refreshes on its own schedule** — that is the real limit on
-freshness:
+| Mode | Cadence | Entered by |
+| --- | --- | --- |
+| Low power | once a minute, on the minute | the default; `onEnterSleep` fires |
+| **High power** | **once a second**, ~10 s | wrist raise / gesture / button; `onExitSleep` fires |
+
+That 1 Hz burst is why `Data` caches. Read naively, a gesture would walk the
+sensor history ten times in ten seconds to redraw a graph whose bars are eight
+minutes wide.
+
+### The three cache tiers in `Data`
+
+| Tier | What | Refresh |
+| --- | --- | --- |
+| **Per frame** | clock; `DeviceSettings` (DND, alarm, notification count); `SystemStats` (battery %); step count | every `onUpdate` — so a gesture shows them live |
+| **`SLOW_TTL`** (5 min) | graph series, Body Battery, weather, battery-days estimate | at most once per TTL |
+| **Per day / per change** | sunrise & sunset, the date string; app properties | once a day; properties on a settings change |
+
+The per-frame tier is deliberately the set the user notices: raise your wrist
+and the notification badge, DND, alarm and steps are current to the second. The
+`DeviceSettings` and `SystemStats` snapshots are taken **once** in
+`Data.beginFrame()` and shared by every row, rather than each row calling the
+system for itself.
+
+Nothing caches to `Application.Storage` — that hits the filesystem and would
+cost more than it saves. It is plain in-memory state, bounded, rebuilt on launch.
+
+**No gesture throttle is needed.** A repeated or false-positive wrist raise
+costs one extra draw and two cheap system snapshots; every expensive read is
+already behind a TTL, so the tenth gesture in a minute does no sensor work at
+all.
+
+### What the underlying source can actually do
 
 | Field | Source refresh | Notes |
 | --- | --- | --- |
-| Time / date | instant | the minute rollover triggers the redraw |
-| Steps | continuous in firmware | displayed count lags up to ~1 min |
-| Battery % / days | slow (tens of minutes for 1%) | `batteryInDays` is a periodic firmware estimate |
-| Body Battery | SensorHistory sample every few minutes | we read the newest sample |
-| Graph — heart rate | history sample ~1-2 min at rest | faster during activity |
-| Graph — stress / Pulse Ox | minutes (stress) to ~hourly (Pulse Ox) | |
-| Graph — pressure / elevation | barometer history every few minutes | |
+| Time / date | instant | date text rebuilt at local midnight |
+| Steps | continuous in firmware | shown live on gesture |
+| DND / alarm / notification count | instant | shown live on gesture |
+| Battery % | slow (tens of minutes for 1%) | read per frame anyway, it is free |
+| Battery days | periodic firmware estimate | cached 5 min |
+| Body Battery | SensorHistory sample every few minutes | cached 5 min |
+| Graph — heart rate | history sample ~1-2 min at rest | faster during activity; cached 5 min |
+| Graph — stress / Pulse Ox | minutes (stress) to ~hourly (Pulse Ox) | cached 5 min |
+| Graph — pressure / elevation | barometer history every few minutes | cached 5 min |
 | **Weather** (temp, hi/lo, precip) | **~hourly** | synced from the phone, on opening the weather glance, or on a large location move. Can be an hour+ old; `CurrentConditions.observationTime` carries the age (not displayed). |
-| DND / alarm / notification count | instant in device settings | face reflects it on the next minute tick |
-| Daylight arc (sunrise/sunset) | fixed for the day | recomputed each frame, cheap |
+| Daylight arc | sunrise/sunset fixed for the day | resolved once a day, then plain arithmetic each frame so the arc still moves smoothly |
 
 Practical upshot: **weather is the stale one** — wrong numbers almost always
-mean the watch hasn't re-synced, not a bug. Steps/DND/notifications feel laggy
-by up to a minute because the face rides the minute tick rather than event
-callbacks (which a watch face mostly can't get anyway).
+mean the watch hasn't re-synced, not a bug.
+
+### If you add a reading
+
+Ask which tier it belongs in. If it walks a history iterator, hits the network,
+or its answer changes slower than a minute, it belongs behind `fresh(...)` with
+its own `mFooAt` timestamp. Only put it in the per-frame tier if it is both
+cheap *and* something the user wants live on a wrist raise.
 
 ---
 
@@ -467,12 +533,19 @@ If the colour should be user-selectable instead, see *Add a setting*.
 <summary><b>Add a new reading to a row</b></summary>
 
 1. Add a guarded getter to `Data.mc` — `has`/null/`try`, returning `null` on any
-   failure. Follow `batteryDays()` as a template.
-2. In the relevant `draw*` method, call it, and `if (value == null) { return; }`
+   failure.
+2. **Pick its refresh tier (§10).** If it is cheap and wanted live on a wrist
+   raise, read it per frame — follow `notificationCount()`. If it walks a
+   history iterator or changes slower than a minute, cache it — follow
+   `batteryDays()`: an `mFooAt` timestamp plus an early
+   `if (fresh(mFooAt)) { return mFoo; }`.
+3. If it needs `DeviceSettings` or `SystemStats`, use the frame snapshot
+   (`mSettings` / `mStats`) — never call the system again.
+4. In the relevant `draw*` method, call it, and `if (value == null) { return; }`
    or skip just that piece.
-3. Place it with a fraction of `mWidth` / `mHeight`, or measure it with
+5. Place it with a fraction of `mWidth` / `mHeight`, or measure it with
    `dc.getTextDimensions`.
-4. Mirror the draw change into `preview.py`, adding a fixed sample value to its
+6. Mirror the draw change into `preview.py`, adding a fixed sample value to its
    `SAMPLE` dict.
 </details>
 
@@ -536,8 +609,16 @@ static types, compiled to bytecode. The things that bite:
   `if (x != null) { … x … }` is fine for a local `x`; for `this.mFoo` or
   `arr[i]`, copy to a local first.
 - **Every `Rez.*` reference must resolve** to something in `resources/`.
-- **The heap is tiny.** Don't build big arrays or hold bitmaps. `onUpdate`
-  allocating a little each minute is fine; a leak is not.
+- **The heap is tiny, and `onUpdate` can run at 1 Hz.** Allocation in the draw
+  path is the thing to watch: `System.getDeviceSettings()`,
+  `System.getSystemStats()`, `Gregorian.info()`, `Time.Duration`, array literals
+  and every `format()` all allocate, and the collector then has to clean up
+  after them sixty times a minute during a gesture. Take the snapshot once
+  (`Data.beginFrame`), cache the rest, and prefer returning a stored value to
+  rebuilding one.
+- **Module-level `var` is fine and is how `Data` holds its cache.** These are
+  bounded, deliberate retentions, not leaks — but nothing unbounded should ever
+  accumulate there.
 - Reference: <https://developer.garmin.com/connect-iq/monkey-c/>
 
 ---

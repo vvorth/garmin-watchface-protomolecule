@@ -91,7 +91,7 @@ SAMPLE = {
     "body_battery": 35,
     "dnd": True,
     "alarm": True,
-    "steps": "6.8k",
+    "steps": "13.5k",  # Data.formatSteps: always one decimal past 1000
     "battery_days": "12d",
     "battery_pct": "64%",
     "notifications": 1,

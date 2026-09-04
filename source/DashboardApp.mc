@@ -22,7 +22,10 @@ class DashboardApp extends Application.AppBase {
     return [new DashboardSettingsMenu(), new DashboardSettingsDelegate()];
   }
 
+  //! Garmin Connect pushed a new property value. Data caches the properties
+  //! rather than re-reading them every frame, so it has to be told they moved.
   function onSettingsChanged() as Void {
+    Data.invalidateProperties();
     WatchUi.requestUpdate();
   }
 }
