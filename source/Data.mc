@@ -498,8 +498,16 @@ module Data {
 
   // --------------------------------------------------------------- daylight
 
-  //! How much of today's daylight is left: 1.0 at sunrise, 0.0 at sunset.
-  //! Null when neither the weather service nor the last fix gives a position.
+  //! How much of today's daylight is left, as a fraction of the whole day:
+  //!
+  //!   before sunrise (night)  0.0   empty
+  //!   at sunrise              1.0   full
+  //!   through the day               drains linearly
+  //!   at and after sunset     0.0   empty
+  //!
+  //! So the arc is dark all night, snaps to full at sunrise, and drains back to
+  //! nothing by sunset. Null when neither the weather service nor the last fix
+  //! gives a position, which drops the fill and leaves the grey track.
   //!
   //! Sunrise and sunset are resolved once a day and the fraction is then plain
   //! arithmetic — the arc still moves smoothly every frame, but the two
@@ -515,10 +523,8 @@ module Data {
     if (!mHasSun || mSunDay != mLocalDay) {
       return null;
     }
-    if (mNowSec <= mSunriseSec) {
-      return 1.0;
-    }
-    if (mNowSec >= mSunsetSec) {
+    // Night, either side of the daylight window.
+    if (mNowSec <= mSunriseSec || mNowSec >= mSunsetSec) {
       return 0.0;
     }
     return (mSunsetSec - mNowSec) / ((mSunsetSec - mSunriseSec) * 1.0);

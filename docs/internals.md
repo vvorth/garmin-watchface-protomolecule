@@ -452,7 +452,7 @@ all.
 | Graph — stress / Pulse Ox | minutes (stress) to ~hourly (Pulse Ox) | cached 5 min |
 | Graph — pressure / elevation | barometer history every few minutes | cached 5 min |
 | **Weather** (temp, hi/lo, precip) | **~hourly** | synced from the phone, on opening the weather glance, or on a large location move. Can be an hour+ old; `CurrentConditions.observationTime` carries the age (not displayed). |
-| Daylight arc | sunrise/sunset fixed for the day | resolved once a day, then plain arithmetic each frame so the arc still moves smoothly |
+| Daylight arc | sunrise/sunset fixed for the day | resolved once a day, then plain arithmetic each frame so the arc still moves smoothly. 0.0 overnight (empty), 1.0 at sunrise, draining to 0.0 at sunset |
 
 Practical upshot: **weather is the stale one** — wrong numbers almost always
 mean the watch hasn't re-synced, not a bug.

@@ -78,6 +78,8 @@ module Layout {
   const ARC_LEFT_TO as Number = 205;
   const ARC_CENTER as Number = 270; // device battery grows both ways from here
   const ARC_CENTER_SPREAD as Number = 23;
-  const ARC_RIGHT_FROM as Number = 303; // daylight grows towards ARC_RIGHT_TO
+  // Daylight is anchored at the low end and grows up towards ARC_RIGHT_TO, so
+  // it fills to full at sunrise and then retracts from the top down all day.
+  const ARC_RIGHT_FROM as Number = 303;
   const ARC_RIGHT_TO as Number = 335;
 }

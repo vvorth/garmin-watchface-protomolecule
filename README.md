@@ -24,7 +24,7 @@ The design this was built to, and the original brief behind each row, are in
 | 4 | Time — Chivo bitmap digits, hours and minutes each a configurable colour (default white / cyan), the gap between them on the screen centre line |
 | 5 | Body Battery · do-not-disturb (red on / grey off) · alarm (yellow on / grey off) · steps (`6.0k` / `13.5k` past 1000, always one decimal so the width holds still) — text light grey |
 | 6 | Battery days remaining · notification badge (orange with a count, grey and empty at zero) · battery percentage |
-| Arcs | left: Body Battery, filling upwards · centre: device battery, filling out of 6 o'clock both ways · right: daylight left, full at sunrise and empty at sunset. Each is a grey full-length track with a slightly thicker coloured fill on top. |
+| Arcs | left: Body Battery, filling upwards · centre: device battery, filling out of 6 o'clock both ways · right: daylight left in yellow — empty overnight, full at sunrise, draining from the top down until it is empty again at sunset. Each is a grey full-length track with a slightly thicker coloured fill on top. |
 
 Anything the watch cannot supply is simply left out: no weather sync means the
 weather row shows `--`, a device with no Body Battery sensor gets no left-arc
