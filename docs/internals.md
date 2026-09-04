@@ -351,7 +351,15 @@ generated module called `Rez`. The XML `id` becomes the symbol name:
 > single most common first-build error when adding a setting.
 
 `manifest.xml` ties it together: the app id, the target `<iq:product>` list, the
-permissions (`SensorHistory` here), and `launcherIcon`. `monkey.jungle` is the
+permissions and `launcherIcon`. Two permissions are declared, and **a missing
+one fails silently rather than loudly** — the API just returns null, so the
+element quietly never appears:
+
+| Permission | Needed for |
+| --- | --- |
+| `SensorHistory` | the graph and the Body Battery reading |
+| `Positioning` | the daylight arc — without it `observationLocationPosition` is documented to return null and `Position` is unavailable |
+ `monkey.jungle` is the
 build file — it points at the manifest and sets `sourcePath` / `resourcePath` to
 `source` / `resources` (the defaults, stated explicitly).
 
@@ -487,7 +495,7 @@ all.
 | Graph — stress / Pulse Ox | minutes (stress) to ~hourly (Pulse Ox) | cached 5 min |
 | Graph — pressure / elevation | barometer history every few minutes | cached 5 min |
 | **Weather** (temp, hi/lo, precip) | **~hourly** | synced from the phone, on opening the weather glance, or on a large location move. Can be an hour+ old; `CurrentConditions.observationTime` carries the age (not displayed). |
-| Daylight arc | sunrise/sunset fixed for the day | resolved once a day, then plain arithmetic each frame so the arc still moves smoothly. 0.0 overnight (empty), 1.0 at sunrise, draining to 0.0 at sunset |
+| Daylight arc | sunrise/sunset fixed for the day | needs a position and so the `Positioning` permission. Resolved once a day (retried every `SLOW_TTL` until it succeeds), then plain arithmetic each frame so the arc still moves smoothly. 0.0 overnight (empty), 1.0 at sunrise, draining to 0.0 at sunset |
 
 Practical upshot: **weather is the stale one** — wrong numbers almost always
 mean the watch hasn't re-synced, not a bug.

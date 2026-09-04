@@ -12,6 +12,11 @@
     </iq:products>
     <iq:permissions>
       <iq:uses-permission id="SensorHistory"/>
+      <!-- Needed for the daylight arc. Without it Weather's
+           observationLocationPosition is null by design and
+           Position.getInfo() is unavailable, so sunrise/sunset
+           cannot be resolved and the arc never fills. -->
+      <iq:uses-permission id="Positioning"/>
     </iq:permissions>
     <iq:languages>
       <iq:language>eng</iq:language>

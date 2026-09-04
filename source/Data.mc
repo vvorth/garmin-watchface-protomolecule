@@ -3,6 +3,7 @@ import Toybox.ActivityMonitor;
 import Toybox.Application.Properties;
 import Toybox.Lang;
 import Toybox.Math;
+import Toybox.Position;
 import Toybox.SensorHistory;
 import Toybox.System;
 import Toybox.Time;
@@ -560,19 +561,79 @@ module Data {
     }
   }
 
+  //! Somewhere to put the sun. Tries three sources, newest and most precise
+  //! first, and returns the first one that looks real:
+  //!
+  //!   1. the current activity's fix — only set while/after a GPS activity
+  //!   2. the weather observation position — the phone's location, refreshed
+  //!      whenever weather syncs, so this is the one that usually answers
+  //!   3. the last known GPS fix the system still has cached — may be stale,
+  //!      but a hundred kilometres of staleness only moves sunrise by a minute
+  //!
+  //! **All three need the `Positioning` permission in manifest.xml.** Without
+  //! it `observationLocationPosition` is documented to return null and the
+  //! `Position` module is unavailable, so every source fails and the daylight
+  //! arc silently never fills.
   function position() {
     try {
       var activity = Activity.getActivityInfo();
-      if (activity != null && activity.currentLocation != null) {
-        return activity.currentLocation;
+      if (activity != null) {
+        var fix = activity.currentLocation;
+        if (usableLocation(fix)) {
+          return fix;
+        }
       }
     } catch (e) {
-      // fall through to the weather observation position
+      // fall through
     }
+
     var conditions = currentConditions();
     if (conditions != null && conditions has :observationLocationPosition) {
-      return conditions.observationLocationPosition;
+      var observed = conditions.observationLocationPosition;
+      if (usableLocation(observed)) {
+        return observed;
+      }
     }
+
+    try {
+      if (Toybox has :Position) {
+        var info = Position.getInfo();
+        if (info != null) {
+          var last = info.position;
+          if (usableLocation(last)) {
+            return last;
+          }
+        }
+      }
+    } catch (e) {
+      // fall through
+    }
+
     return null;
+  }
+
+  //! Rejects null and null island. Some firmware returns a zero location
+  //! instead of null when it has no fix; taken at face value that puts the
+  //! user in the Gulf of Guinea and the daylight arc reads plausibly but
+  //! wrongly, which is worse than showing nothing.
+  function usableLocation(location) as Boolean {
+    if (location == null) {
+      return false;
+    }
+    try {
+      var degrees = location.toDegrees();
+      if (degrees == null || degrees.size() < 2) {
+        return false;
+      }
+      var lat = degrees[0];
+      var lon = degrees[1];
+      if (lat == null || lon == null) {
+        return false;
+      }
+      // Within ~100 m of (0, 0) is not a place anyone lives.
+      return !(lat > -0.001 && lat < 0.001 && lon > -0.001 && lon < 0.001);
+    } catch (e) {
+      return false;
+    }
   }
 }

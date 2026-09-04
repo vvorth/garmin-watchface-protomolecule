@@ -135,5 +135,6 @@ python3 tools/preview.py --sleep out.png                  # burn-in variant
 | `Cannot find device 'fenix8solar47mm'` | Device files not installed — **Connect IQ: Download Devices** in VS Code, or the SDK Manager. |
 | `Invalid device id 'fenix847mm'` / `'fenix843mm'` | Old, dropped targets — if you see these your checkout predates the manifest trim. The current manifest is `fenix8solar47mm` + `fenix8solar51mm` only. |
 | `Undefined symbol ':SomeString'` | A `Rez.Strings.*` reference with no matching entry in `resources/strings/strings.xml`. Usually a half-finished setting. |
+| Daylight arc never fills, even in daylight | Needs a position. Check `manifest.xml` still declares `Positioning`; then give the watch a location — sync weather from the phone, or record a short GPS activity once. A reinstall is needed after a permission change. |
 | Face loads but weather/graph are blank | Expected until the watch has synced weather and has sensor history. Not a bug — each missing input drops its element. |
 | Simulator shows nothing on the graph | **File → Simulate Data → Sensor History** (and pick the matching source in the face's settings). |

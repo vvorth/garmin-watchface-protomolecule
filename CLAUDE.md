@@ -97,6 +97,12 @@ shifts.
   not have synced. `source/Data.mc` is the only place that reads watch state and
   every read there is behind a `has` check, a null check, or a `try`. A missing
   sensor must drop its element, never crash the face.
+- **A missing permission fails silently.** The API returns null and the element
+  just never appears, with no error anywhere. `manifest.xml` declares
+  `SensorHistory` (graph, Body Battery) and `Positioning` (daylight arc — it
+  gates `observationLocationPosition` and the whole `Position` module). If a
+  reading is permanently blank on device but fine in the simulator, check the
+  permission first.
 - **Respect the refresh tiers in `Data.mc`.** `Data.beginFrame()` takes one
   `DeviceSettings` per frame and `Data.stats()` caches `SystemStats` on the slow
   tier — never call either system API again from a `draw*` method. Anything that

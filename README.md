@@ -239,6 +239,10 @@ with a rerun at a scaled `--px`.
 - **The weather condition icons are approximations** grouped into eight shapes
   (sun, partly cloudy, cloudy, rain, snow, storm, fog, wind); Connect IQ reports
   around fifty distinct conditions.
-- **Daylight needs a position.** It comes from the last activity fix, falling
-  back to the weather station's location. Until the watch has one, the right
-  arc stays empty.
+- **Daylight needs a position**, and therefore the `Positioning` permission,
+  which `manifest.xml` declares. The location comes from the current activity's
+  GPS fix, else the weather observation position (the phone's location, updated
+  on each weather sync), else the last known fix the system still has cached.
+  Until one of those answers, the right arc stays empty — a location of exactly
+  (0, 0) is rejected, because some firmware returns that instead of null when it
+  has no fix.
